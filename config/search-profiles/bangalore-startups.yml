@@ -1,0 +1,45 @@
+# Search Profile: bangalore-startups
+# Source-based discovery — no fixed company list.
+# The scanner queries these sources with your keywords + location.
+
+location: Bangalore
+remote: false
+
+title_filter:
+  positive:
+    - "Founding Engineer"
+    - "Full Stack"
+    - "Software Engineer"
+    - "Backend Engineer"
+    - "Backend Developer"
+    - "AI Engineer"
+    - "Engineering Manager"
+    - "Tech Lead"
+    - "Head of Engineering"
+  negative:
+    - "Junior"
+    - "Intern"
+    - "Internship"
+    - "Trainee"
+    - "Associate"
+    - "Entry Level"
+    - "Fresher"
+
+sources:
+  - linkedin
+  - yc_wats
+  - wellfound
+  - naukri
+  - instahyre
+  - cutshort
+  - hn_hiring
+  - topstartups
+
+company_filter:
+  max_size: 200
+  funding: "Series A to C"
+  exclude_mncs: true
+
+pipeline_settings:
+  filter_by_score: false
+  min_score: 60

@@ -1,0 +1,46 @@
+# Search Profile: global
+# Broad search across all locations and company types.
+
+location: Remote
+remote: true
+
+title_filter:
+  positive:
+    - "Founding Engineer"
+    - "Full Stack"
+    - "Fullstack"
+    - "Software Engineer"
+    - "Backend Engineer"
+    - "Backend Developer"
+    - "Frontend Engineer"
+    - "Frontend Developer"
+    - "ML Engineer"
+    - "Machine Learning Engineer"
+    - "AI Engineer"
+    - "Data Engineer"
+    - "Platform Engineer"
+    - "DevOps Engineer"
+    - "SRE"
+    - "Engineering Manager"
+    - "Tech Lead"
+  negative:
+    - "Junior"
+    - "Intern"
+    - "Internship"
+    - "Trainee"
+    - "Entry Level"
+    - "Fresher"
+
+sources:
+  - linkedin
+  - yc_wats
+  - wellfound
+  - hn_hiring
+  - topstartups
+
+company_filter:
+  exclude_mncs: false
+
+pipeline_settings:
+  filter_by_score: false
+  min_score: 60
