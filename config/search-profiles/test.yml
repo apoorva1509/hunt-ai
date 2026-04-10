@@ -1,0 +1,12 @@
+# Search Profile: test
+# Created 2026-04-08
+
+title_filter:
+  positive:
+    - "Software Engineer"
+  negative:
+    - "Junior"
+    - "Intern"
+
+tracked_companies:
+  # Add companies here
