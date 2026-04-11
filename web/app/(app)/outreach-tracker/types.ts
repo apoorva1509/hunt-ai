@@ -102,3 +102,24 @@ export const GUIDANCE_CHANNELS: {
   { key: "email", label: "Email" },
   { key: "whatsapp", label: "WhatsApp" },
 ];
+
+export type FollowUpStoppedReason = "manual" | "replied" | "closed";
+
+export type ReminderStatus = "pending" | "notified" | "acted" | "dismissed";
+
+export interface FollowUpReminder {
+  _id: Id<"followUpReminders">;
+  contactId: Id<"outreachContacts">;
+  companyId: Id<"outreachCompanies">;
+  channel: "linkedin_dm" | "linkedin_connection" | "email";
+  dueAt: number;
+  status: ReminderStatus;
+  lastOutboundMessageId?: Id<"outreachMessages">;
+  updatedAt: number;
+}
+
+export const STOPPED_REASON_LABELS: Record<FollowUpStoppedReason, string> = {
+  manual: "Stopped manually",
+  replied: "Contact replied",
+  closed: "Company closed",
+};
