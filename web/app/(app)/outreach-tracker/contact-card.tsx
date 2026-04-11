@@ -14,7 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
-  Linkedin,
+  Link2,
   Mail,
   Phone,
   Plus,
@@ -50,7 +50,7 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
   const messages = useOutreachMessages(expanded ? contact._id : null);
   const guidance = useOutreachGuidance(expanded ? contact._id : null);
   const reminders = useFollowUpRemindersByContact(contact._id);
-  const activeReminder = reminders?.find((r) => isOverdue(r));
+  const activeReminder = reminders?.find((r: any) => isOverdue(r));
   const upsertGuidance = useMutation(api.outreachGuidance.upsert);
   const removeContact = useMutation(api.outreachContacts.remove);
   const dismissReminder = useMutation(api.followUpReminders.dismiss);
@@ -231,11 +231,6 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
                       activeReminder.channel !== "email" && (
                         <button
                           onClick={async () => {
-                            if (suggestion) {
-                              await navigator.clipboard.writeText(
-                                suggestion.message
-                              );
-                            }
                             const linkedinUrl = contact.linkedinUrl!;
                             const messagingUrl = linkedinUrl.includes(
                               "/messaging/"
@@ -247,7 +242,7 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
                           }}
                           className="flex items-center gap-1 rounded-md bg-blue-100 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
                         >
-                          <Linkedin className="h-3 w-3" />
+                          <Link2 className="h-3 w-3" />
                           Open LinkedIn
                         </button>
                       )}

@@ -43,7 +43,7 @@ export function useFollowUpNotifications() {
   return {
     overdueCount:
       reminders?.filter(
-        (r) => r.status === "pending" || r.status === "notified"
+        (r: any) => r.status === "pending" || r.status === "notified"
       ).length ?? 0,
   };
 }
