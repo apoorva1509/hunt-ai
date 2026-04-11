@@ -267,39 +267,40 @@ async function handleSync() {
 
   showButtonStatus(btn, `Syncing ${messages.length} msgs...`, "#f59e0b");
 
-  try {
-    const response = await fetch(convexUrl + "/api/linkedin-sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contactLinkedinUrl: fullPartnerUrl,
-        messages: messages.map((m) => ({
-          body: m.body,
-          direction: m.direction,
-          sentAt: m.sentAt || new Date().toISOString(),
-        })),
-      }),
-    });
+  const payload = {
+    contactLinkedinUrl: fullPartnerUrl,
+    messages: messages.map((m) => ({
+      body: m.body,
+      direction: m.direction,
+      sentAt: m.sentAt || new Date().toISOString(),
+    })),
+  };
 
-    const result = await response.json();
-    if (response.ok) {
-      showButtonStatus(
-        btn,
-        `Synced ${result.synced}, skipped ${result.skipped}`,
-        "#22c55e",
-        4000
-      );
-    } else {
-      showButtonStatus(
-        btn,
-        result.error || "Sync failed",
-        "#ef4444",
-        4000
-      );
+  // Send via background script to bypass LinkedIn CSP
+  chrome.runtime.sendMessage(
+    { type: "CAREER_OPS_SYNC", payload },
+    (response) => {
+      if (!response) {
+        showButtonStatus(btn, "Extension error — reload extension", "#ef4444", 4000);
+        return;
+      }
+      if (response.ok && response.data.success) {
+        showButtonStatus(
+          btn,
+          `Synced ${response.data.synced}, skipped ${response.data.skipped}`,
+          "#22c55e",
+          4000
+        );
+      } else {
+        showButtonStatus(
+          btn,
+          response.data?.error || response.error || "Sync failed",
+          "#ef4444",
+          4000
+        );
+      }
     }
-  } catch (err) {
-    showButtonStatus(btn, "Network error", "#ef4444", 4000);
-  }
+  );
 }
 
 function showButtonStatus(btn, text, color, resetAfter) {
