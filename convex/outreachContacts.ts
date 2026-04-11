@@ -1,4 +1,4 @@
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query, action, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { requirePerson } from "./helpers/auth";
 import { api, internal } from "./_generated/api";
@@ -103,6 +103,16 @@ export const listAll = query({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("outreachContacts").collect();
+  },
+});
+
+export const setLinkedinUrl = internalMutation({
+  args: {
+    id: v.id("outreachContacts"),
+    linkedinUrl: v.string(),
+  },
+  handler: async (ctx, { id, linkedinUrl }) => {
+    await ctx.db.patch(id, { linkedinUrl, updatedAt: Date.now() });
   },
 });
 
