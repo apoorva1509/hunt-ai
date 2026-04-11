@@ -8,7 +8,10 @@ import {
 import { CompanyCard } from "./company-card";
 import { AddCompanyDialog } from "./add-company-dialog";
 import { useFollowUpNotifications } from "@/hooks/use-follow-up-notifications";
-import { Plus, Target } from "lucide-react";
+import { ImportLinkedinDialog } from "./import-linkedin-dialog";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Download, Plus, Target } from "lucide-react";
 import type { CompanyStatusFilter } from "./types";
 import { STATUS_TABS } from "./types";
 
@@ -17,6 +20,9 @@ export default function OutreachTrackerPage() {
   const overdueCount = useOverdueCount();
   useFollowUpNotifications();
   const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importStatus, setImportStatus] = useState("");
+  const createMessage = useMutation(api.outreachMessages.create);
   const [tab, setTab] = useState<CompanyStatusFilter>("all");
 
   if (companies === undefined) {
@@ -46,13 +52,22 @@ export default function OutreachTrackerPage() {
             </span>
           )}
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
-          <Plus className="h-4 w-4" />
-          Add Company
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowImport(true)}
+            className="flex items-center gap-2 rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            <Download className="h-4 w-4" />
+            Import LinkedIn
+          </button>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="flex items-center gap-2 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          >
+            <Plus className="h-4 w-4" />
+            Add Company
+          </button>
+        </div>
       </div>
 
       {/* Filter tabs */}
@@ -96,6 +111,57 @@ export default function OutreachTrackerPage() {
       )}
 
       <AddCompanyDialog open={showAdd} onClose={() => setShowAdd(false)} />
+      <ImportLinkedinDialog
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImport={async (data) => {
+          try {
+            // Find matching contact by LinkedIn URL
+            const allContacts = await fetch("/api/noop").catch(() => null); // unused
+            // We need to match across companies — use listAll query via HTTP
+            const normalize = (url: string) =>
+              url.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
+
+            let matchedContact: any = null;
+            for (const company of companies ?? []) {
+              // We don't have contacts loaded for all companies here,
+              // so use the HTTP endpoint which has access to all contacts
+            }
+
+            // Call the Convex HTTP endpoint from the web app (same origin policy is fine
+            // since the web app isn't on LinkedIn's CSP-restricted domain)
+            const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || "https://steady-opossum-661.convex.cloud";
+            const res = await fetch(convexUrl + "/api/linkedin-sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            });
+            const result = await res.json();
+            if (result.success) {
+              setImportStatus(
+                `Synced ${result.synced} messages for ${result.contactName} (${result.skipped} skipped)`
+              );
+            } else {
+              setImportStatus(`Error: ${result.error}`);
+            }
+            setTimeout(() => setImportStatus(""), 5000);
+          } catch (err: any) {
+            setImportStatus(`Error: ${err.message}`);
+            setTimeout(() => setImportStatus(""), 5000);
+          }
+        }}
+      />
+      {importStatus && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
+            importStatus.startsWith("Error")
+              ? "bg-red-500"
+              : "bg-green-500"
+          }`}
+        >
+          {importStatus}
+        </div>
+      )}
     </div>
   );
 }
