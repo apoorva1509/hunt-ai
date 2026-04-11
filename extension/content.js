@@ -8,13 +8,10 @@ const SYNC_BTN_ID = "career-ops-sync-btn";
 const TOOLBAR_ID = "career-ops-toolbar";
 
 // ─── Config ───────────────────────────────────────────────────
-// Set via extension storage (popup or options page)
-// Fallback: read from localStorage for easy testing
+const CONVEX_URL = "https://steady-opossum-661.convex.cloud";
+
 function getConvexUrl() {
-  return (
-    localStorage.getItem("CAREER_OPS_CONVEX_URL") ||
-    ""
-  );
+  return CONVEX_URL;
 }
 
 // ─── DOM Helpers ──────────────────────────────────────────────
