@@ -33,16 +33,18 @@ export async function classifyArchetype(
     return { id: keywordResult.id, method: "keyword" };
   }
 
-  // Slow path: Claude Haiku
-  try {
-    const client = getAnthropic();
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 50,
-      messages: [
-        {
-          role: "user",
-          content: `Classify this job description into exactly one archetype. Reply with ONLY the archetype ID, nothing else.
+  // Slow path: Claude Haiku (with retry for rate limits)
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const client = getAnthropic();
+      const response = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 50,
+        messages: [
+          {
+            role: "user",
+            content: `Classify this job description into exactly one archetype. Reply with ONLY the archetype ID, nothing else.
 
 Archetypes:
 - ai_platform_llmops: ML infra, model serving, training pipelines, MLOps
@@ -54,19 +56,29 @@ Archetypes:
 
 JD (first 2000 chars):
 ${jdText.slice(0, 2000)}`,
-        },
-      ],
-    });
+          },
+        ],
+      });
 
-    const text =
-      response.content[0].type === "text"
-        ? response.content[0].text.trim().toLowerCase()
-        : "";
+      const text =
+        response.content[0].type === "text"
+          ? response.content[0].text.trim().toLowerCase()
+          : "";
 
-    const matched = VALID_ARCHETYPES.find((a) => text.includes(a));
-    if (matched) return { id: matched, method: "llm" };
-  } catch (err) {
-    console.warn("[classifier] LLM classification failed:", (err as Error).message);
+      const matched = VALID_ARCHETYPES.find((a) => text.includes(a));
+      if (matched) return { id: matched, method: "llm" };
+      break; // Got a response but no match — don't retry
+    } catch (err) {
+      const msg = (err as Error).message ?? "";
+      if (msg.includes("429") || msg.includes("rate_limit")) {
+        const backoffMs = Math.min(2000 * 2 ** attempt, 30000);
+        console.warn(`[classifier] Rate limited, retrying in ${backoffMs / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})...`);
+        await new Promise((r) => setTimeout(r, backoffMs));
+        continue;
+      }
+      console.warn("[classifier] LLM classification failed:", msg);
+      break;
+    }
   }
 
   // Default fallback

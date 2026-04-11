@@ -5,6 +5,7 @@
 
 import type { SourceAdapter, SourceQuery } from "./types.js";
 import type { DiscoveredJob } from "../types.js";
+import { isValidCompanyName } from "./searxng-helper.js";
 
 const TIMEOUT = 15000;
 
@@ -36,6 +37,7 @@ export const naukriSource: SourceAdapter = {
         const jobs = parseNaukriHTML(html);
 
         for (const job of jobs) {
+          if (!isValidCompanyName(job.company)) continue;
           const key = `${job.company}|${job.role}`.toLowerCase();
           if (seen.has(key)) continue;
           seen.add(key);

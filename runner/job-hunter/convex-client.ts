@@ -142,6 +142,52 @@ export async function loadAgentConfigById(agentId: string): Promise<{
   };
 }
 
+// ── Tracker URL Helpers (for watch mode) ────────────────────
+
+export async function getPendingTrackerUrls(): Promise<
+  Array<{ _id: string; agentId: string; url: string; notes?: string }>
+> {
+  const c = getClient();
+  return await c.query(api.trackerUrls.listPending, {});
+}
+
+export async function markTrackerProcessing(
+  id: string
+): Promise<{ _id: string; url: string; agentId: string } | null> {
+  const c = getClient();
+  return await c.mutation(api.trackerUrls.markProcessing, {
+    id: id as any,
+  });
+}
+
+export async function markTrackerEvaluated(
+  id: string,
+  result: {
+    title?: string;
+    company?: string;
+    score?: number;
+    archetype?: string;
+    location?: string;
+    workMode?: string;
+    salary?: string;
+    notes?: string;
+  }
+) {
+  const c = getClient();
+  await c.mutation(api.trackerUrls.markEvaluated, {
+    id: id as any,
+    ...result,
+  });
+}
+
+export async function markTrackerFailed(id: string, error: string) {
+  const c = getClient();
+  await c.mutation(api.trackerUrls.markFailed, {
+    id: id as any,
+    error,
+  });
+}
+
 export function createItemForAgent(agentId: string) {
   return async (args: {
     runId?: string;

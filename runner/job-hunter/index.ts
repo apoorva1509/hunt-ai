@@ -40,10 +40,9 @@ import {
 } from "./research.js";
 import { scoreJob } from "./job-scoring.js";
 import { synthesizePainMap } from "./messages.js";
-import { generateOutreach } from "./messages.js";
-import { scoreMessage } from "./message-scoring.js";
 import { closeBrowser } from "./linkedin.js";
 import { loadPipelineSettings } from "./portal-scanner.js";
+import { processTrackerUrls } from "./tracker-processor.js";
 import type { PipelineResult, ClassifiedJob, OutreachStrategy, AgentConfig } from "./types.js";
 const MAX_COMPANIES = parseInt(process.env.MAX_COMPANIES ?? "12", 10);
 const MAX_DMS_PER_COMPANY = 5;
@@ -238,7 +237,6 @@ async function runPipeline(
         console.log(`    No DMs found — lead created without outreach`);
       }
       const dmsToProcess = rawDMs.slice(0, MAX_DMS_PER_COMPANY);
-      let strategyIdx = 0;
 
       for (const rawDM of dmsToProcess) {
         console.log(`    DM: ${rawDM.name} (${rawDM.title})${rawDM.email ? ` [${rawDM.email}]` : ""} via ${rawDM.source}`);
@@ -250,8 +248,8 @@ async function runPipeline(
             company: companyName,
           });
 
-          // Write contact to Convex
-          const contactId = await writeItem({
+          // Write contact to Convex (outreach is generated on-demand from the UI)
+          await writeItem({
             runId,
             parentId: leadId,
             type: "contact",
@@ -269,138 +267,6 @@ async function runPipeline(
             },
             actions: ["connection_request", "email", "skip"],
           });
-
-          // Phase 8: Outreach Generation
-          const strategy: OutreachStrategy | null =
-            strategies.length > 0
-              ? strategies[strategyIdx % strategies.length]
-              : null;
-          strategyIdx++;
-
-          const outreach = await generateOutreach(
-            dm,
-            painMap,
-            strategy,
-            config.resumeText,
-            ["linkedin", "email"]
-          );
-
-          // Write outreach drafts to Convex
-          if (outreach.linkedin) {
-            const connScore = scoreMessage(
-              outreach.linkedin.connectionRequest,
-              "linkedin"
-            );
-            await writeItem({
-              runId,
-              parentId: contactId,
-              type: "outreach_draft",
-              title: "LinkedIn Connection Request",
-              subtitle: `Score: ${connScore.total}/100 (${connScore.verdict})`,
-              data: {
-                channel: "linkedin",
-                body: outreach.linkedin.connectionRequest,
-                charCount: outreach.linkedin.connectionRequest.length,
-                messageScore: connScore,
-                approvalRequired: true,
-                strategyId: outreach.strategyId,
-              },
-              actions: ["approve", "edit", "skip"],
-            });
-
-            await writeItem({
-              runId,
-              parentId: contactId,
-              type: "outreach_draft",
-              title: "LinkedIn Follow-Up DM",
-              subtitle: "Send after connection accepted",
-              data: {
-                channel: "linkedin",
-                body: outreach.linkedin.followUpDm,
-                sendAfter: "connection_accepted",
-                sequenceStep: 2,
-                strategyId: outreach.strategyId,
-              },
-              actions: ["approve", "edit", "skip"],
-            });
-
-            await writeItem({
-              runId,
-              parentId: contactId,
-              type: "outreach_draft",
-              title: "LinkedIn Nudge",
-              subtitle: "Day 5-6",
-              data: {
-                channel: "linkedin",
-                body: outreach.linkedin.followUpNudge,
-                sendAfter: "day_5",
-                sequenceStep: 3,
-                strategyId: outreach.strategyId,
-              },
-              actions: ["approve", "edit", "skip"],
-            });
-
-            stats.draftsGenerated += 3;
-          }
-
-          if (outreach.email) {
-            const emailScore = scoreMessage(
-              outreach.email.emailBody,
-              "email",
-              outreach.email.emailSubject
-            );
-            await writeItem({
-              runId,
-              parentId: contactId,
-              type: "outreach_draft",
-              title: `Email: ${outreach.email.emailSubject}`,
-              subtitle: `Score: ${emailScore.total}/100 (${emailScore.verdict})`,
-              data: {
-                channel: "email",
-                subject: outreach.email.emailSubject,
-                body: outreach.email.emailBody,
-                ps: outreach.email.emailPS,
-                messageScore: emailScore,
-                approvalRequired: true,
-                strategyId: outreach.strategyId,
-              },
-              actions: ["approve", "edit", "skip"],
-            });
-
-            await writeItem({
-              runId,
-              parentId: contactId,
-              type: "outreach_draft",
-              title: "Email Follow-Up",
-              subtitle: "Day 5",
-              data: {
-                channel: "email",
-                body: outreach.email.followUp1,
-                sendAfter: "day_5",
-                sequenceStep: 2,
-                strategyId: outreach.strategyId,
-              },
-              actions: ["approve", "edit", "skip"],
-            });
-
-            await writeItem({
-              runId,
-              parentId: contactId,
-              type: "outreach_draft",
-              title: "Email Breakup",
-              subtitle: "Day 12-14",
-              data: {
-                channel: "email",
-                body: outreach.email.breakupEmail,
-                sendAfter: "day_12",
-                sequenceStep: 3,
-                strategyId: outreach.strategyId,
-              },
-              actions: ["approve", "edit", "skip"],
-            });
-
-            stats.draftsGenerated += 3;
-          }
         } catch (err) {
           console.error(`    ERROR: DM processing failed for ${rawDM.name}: ${(err as Error).message}`);
         }
@@ -413,7 +279,7 @@ async function runPipeline(
 
   // ── Complete Run ───────────────────────────────────────
   const summaryObj = {
-    text: `Researched ${stats.companiesResearched} companies. Found ${stats.dmsFound} DMs. ${funnel.leadsCreated} leads. ${stats.draftsGenerated} drafts.`,
+    text: `Researched ${stats.companiesResearched} companies. Found ${stats.dmsFound} DMs. ${funnel.leadsCreated} leads.`,
     funnel,
     stats,
   };
@@ -499,6 +365,13 @@ async function watchMode() {
       }
     } catch (err) {
       console.error("[watch] Poll error:", err);
+    }
+
+    // Process pending tracker URLs
+    try {
+      await processTrackerUrls();
+    } catch (err) {
+      console.error("[watch] Tracker poll error:", err);
     }
 
     await sleep(5000);
