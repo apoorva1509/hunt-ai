@@ -1,12 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Career Ops - LinkedIn Paste",
-  "version": "1.0.0",
-  "description": "Pastes follow-up messages from Career Ops into LinkedIn's message composer",
+  "name": "Career Ops - LinkedIn Sync & Paste",
+  "version": "1.1.0",
+  "description": "Syncs LinkedIn messages to Career Ops and pastes follow-up drafts",
   "permissions": ["clipboardRead"],
   "content_scripts": [
     {
-      "matches": ["https://www.linkedin.com/messaging/*"],
+      "matches": [
+        "https://www.linkedin.com/messaging/*",
+        "https://www.linkedin.com/in/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
