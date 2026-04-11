@@ -1,4 +1,4 @@
-import type { OutreachStep } from "./types";
+import type { OutreachStep, FollowUpReminder } from "./types";
 
 export function stepsProgress(steps: OutreachStep[]): {
   done: number;
@@ -18,4 +18,18 @@ export function formatDate(timestamp: number): string {
     month: "short",
     year: "numeric",
   });
+}
+
+export function isOverdue(reminder: FollowUpReminder): boolean {
+  return (
+    (reminder.status === "pending" || reminder.status === "notified") &&
+    reminder.dueAt <= Date.now()
+  );
+}
+
+export function daysOverdue(reminder: FollowUpReminder): number {
+  return Math.max(
+    0,
+    Math.floor((Date.now() - reminder.dueAt) / (1000 * 60 * 60 * 24))
+  );
 }
