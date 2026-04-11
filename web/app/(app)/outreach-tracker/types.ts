@@ -27,6 +27,8 @@ export interface OutreachContact {
   profilePictureUrl?: string;
   headline?: string;
   source: "manual" | "apollo" | "linkedin";
+  followUpEnabled?: boolean;
+  followUpStoppedReason?: FollowUpStoppedReason;
   updatedAt: number;
 }
 
