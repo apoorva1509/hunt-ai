@@ -1,7 +1,7 @@
 import { mutation, query, action } from "./_generated/server";
 import { v } from "convex/values";
 import { requirePerson } from "./helpers/auth";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 export const listByCompany = query({
   args: { companyId: v.id("outreachCompanies") },
@@ -56,6 +56,14 @@ export const update = mutation({
     phone: v.optional(v.string()),
     profilePictureUrl: v.optional(v.string()),
     headline: v.optional(v.string()),
+    followUpEnabled: v.optional(v.boolean()),
+    followUpStoppedReason: v.optional(
+      v.union(
+        v.literal("manual"),
+        v.literal("replied"),
+        v.literal("closed")
+      )
+    ),
   },
   handler: async (ctx, { id, ...fields }) => {
     await requirePerson(ctx);
@@ -64,6 +72,37 @@ export const update = mutation({
       if (val !== undefined) patch[k] = val;
     }
     await ctx.db.patch(id, patch);
+  },
+});
+
+export const stopFollowUp = mutation({
+  args: {
+    id: v.id("outreachContacts"),
+    reason: v.union(
+      v.literal("manual"),
+      v.literal("replied"),
+      v.literal("closed")
+    ),
+  },
+  handler: async (ctx, { id, reason }) => {
+    await requirePerson(ctx);
+    await ctx.db.patch(id, {
+      followUpEnabled: false,
+      followUpStoppedReason: reason,
+      updatedAt: Date.now(),
+    });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.followUpReminders.dismissAllForContact,
+      { contactId: id }
+    );
+  },
+});
+
+export const listAll = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("outreachContacts").collect();
   },
 });
 
