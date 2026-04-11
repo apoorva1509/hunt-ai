@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Career Ops - LinkedIn Paste",
+  "version": "1.0.0",
+  "description": "Pastes follow-up messages from Career Ops into LinkedIn's message composer",
+  "permissions": ["clipboardRead"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/messaging/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
