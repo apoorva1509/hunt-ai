@@ -1,6 +1,6 @@
 // Background service worker — handles network requests to bypass LinkedIn CSP
 
-const CONVEX_URL = "https://steady-opossum-661.convex.cloud";
+const CONVEX_URL = "https://steady-opossum-661.convex.site";
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type !== "CAREER_OPS_SYNC") return false;
