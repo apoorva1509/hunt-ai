@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { requirePerson } from "./helpers/auth";
 import { internal } from "./_generated/api";
@@ -113,5 +113,44 @@ export const remove = mutation({
   handler: async (ctx, { id }) => {
     await requirePerson(ctx);
     await ctx.db.delete(id);
+  },
+});
+
+// Internal: create message without auth (used by HTTP endpoint for LinkedIn sync)
+export const createFromSync = internalMutation({
+  args: {
+    contactId: v.id("outreachContacts"),
+    companyId: v.id("outreachCompanies"),
+    channel: channelValidator,
+    body: v.string(),
+    sentAt: v.number(),
+    direction: directionValidator,
+  },
+  handler: async (ctx, args) => {
+    const messageId = await ctx.db.insert("outreachMessages", {
+      ...args,
+      updatedAt: Date.now(),
+    });
+
+    if (args.direction === "inbound") {
+      await ctx.db.patch(args.contactId, {
+        followUpEnabled: false,
+        followUpStoppedReason: "replied" as const,
+        updatedAt: Date.now(),
+      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.followUpReminders.dismissAllForContact,
+        { contactId: args.contactId }
+      );
+    } else if (args.direction === "outbound") {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.followUpReminders.markActedForContact,
+        { contactId: args.contactId }
+      );
+    }
+
+    return messageId;
   },
 });

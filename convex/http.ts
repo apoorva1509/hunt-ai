@@ -1,6 +1,6 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 const http = httpRouter();
 
@@ -37,28 +37,61 @@ http.route({
       );
     }
 
-    // Find contact by LinkedIn URL
+    // Find contact by LinkedIn URL, then fallback to name extracted from URL
     const allContacts = await ctx.runQuery(api.outreachContacts.listAll, {});
-    const contact = allContacts.find((c: any) => {
+    const normalize = (url: string) =>
+      url
+        .toLowerCase()
+        .replace(/^https?:\/\//, "")
+        .replace(/^www\./, "")
+        .replace(/\/+$/, "");
+
+    // Try matching by LinkedIn URL first
+    let contact = allContacts.find((c: any) => {
       if (!c.linkedinUrl) return false;
-      // Normalize URLs for comparison (remove trailing slashes, www, etc.)
-      const normalize = (url: string) =>
-        url
-          .toLowerCase()
-          .replace(/^https?:\/\//, "")
-          .replace(/^www\./, "")
-          .replace(/\/+$/, "");
       return normalize(c.linkedinUrl) === normalize(contactLinkedinUrl);
     });
+
+    // Fallback: extract name from LinkedIn URL slug and match by name
+    if (!contact) {
+      // URL like https://www.linkedin.com/in/debangi-chakraborti/ → "debangi chakraborti"
+      const slugMatch = contactLinkedinUrl.match(/\/in\/([^/?]+)/);
+      if (slugMatch) {
+        const slugName = slugMatch[1]
+          .replace(/-/g, " ")
+          .replace(/\d+/g, "")
+          .trim()
+          .toLowerCase();
+
+        contact = allContacts.find((c: any) => {
+          const contactName = c.name.toLowerCase().trim();
+          // Check if slug contains the contact's first and last name
+          const nameParts = contactName.split(" ");
+          return nameParts.every((part: string) => slugName.includes(part));
+        });
+      }
+    }
 
     if (!contact) {
       return new Response(
         JSON.stringify({
           error: "Contact not found",
           contactLinkedinUrl,
+          hint: "Make sure this person is added as a contact in your Outreach Tracker",
         }),
         { status: 404, headers: corsHeaders }
       );
+    }
+
+    // Auto-save LinkedIn URL to contact if they didn't have one
+    if (!contact.linkedinUrl && contactLinkedinUrl) {
+      const fullUrl = contactLinkedinUrl.startsWith("http")
+        ? contactLinkedinUrl
+        : "https://www.linkedin.com" + contactLinkedinUrl;
+      await ctx.runMutation(internal.outreachContacts.setLinkedinUrl, {
+        id: contact._id,
+        linkedinUrl: fullUrl,
+      });
     }
 
     // Get existing messages for dedup
@@ -87,11 +120,10 @@ http.route({
         continue;
       }
 
-      await ctx.runMutation(api.outreachMessages.create, {
+      await ctx.runMutation(internal.outreachMessages.createFromSync, {
         contactId: contact._id,
         companyId: contact.companyId,
-        channel:
-          msg.direction === "outbound" ? "linkedin_dm" : "linkedin_dm",
+        channel: "linkedin_dm" as const,
         body: bodyTrimmed,
         sentAt,
         direction: msg.direction,
