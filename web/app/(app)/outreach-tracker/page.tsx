@@ -1,15 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { useOutreachCompanies } from "@/hooks/use-outreach-tracker";
+import {
+  useOutreachCompanies,
+  useOverdueCount,
+} from "@/hooks/use-outreach-tracker";
 import { CompanyCard } from "./company-card";
 import { AddCompanyDialog } from "./add-company-dialog";
+import { useFollowUpNotifications } from "@/hooks/use-follow-up-notifications";
 import { Plus, Target } from "lucide-react";
 import type { CompanyStatusFilter } from "./types";
 import { STATUS_TABS } from "./types";
 
 export default function OutreachTrackerPage() {
   const companies = useOutreachCompanies();
+  const overdueCount = useOverdueCount();
+  useFollowUpNotifications();
   const [showAdd, setShowAdd] = useState(false);
   const [tab, setTab] = useState<CompanyStatusFilter>("all");
 
@@ -30,9 +36,16 @@ export default function OutreachTrackerPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">
-          Outreach Tracker ({companies.length})
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold">
+            Outreach Tracker ({companies.length})
+          </h1>
+          {overdueCount !== undefined && overdueCount > 0 && (
+            <span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+              {overdueCount} follow-up{overdueCount !== 1 ? "s" : ""} due
+            </span>
+          )}
+        </div>
         <button
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
