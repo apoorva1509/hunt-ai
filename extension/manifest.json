@@ -1,9 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Career Ops - LinkedIn Sync & Paste",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Syncs LinkedIn messages to Career Ops and pastes follow-up drafts",
   "permissions": ["clipboardRead"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -13,5 +16,8 @@
       "js": ["content.js"],
       "run_at": "document_idle"
     }
+  ],
+  "host_permissions": [
+    "https://steady-opossum-661.convex.cloud/*"
   ]
 }
