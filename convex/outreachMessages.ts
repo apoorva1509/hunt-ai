@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requirePerson } from "./helpers/auth";
+import { internal } from "./_generated/api";
 
 const channelValidator = v.union(
   v.literal("linkedin_dm"),
@@ -44,13 +45,48 @@ export const create = mutation({
     body: v.string(),
     sentAt: v.number(),
     direction: directionValidator,
+    gmailMessageId: v.optional(v.string()),
+    gmailThreadId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await requirePerson(ctx);
-    return await ctx.db.insert("outreachMessages", {
+    const messageId = await ctx.db.insert("outreachMessages", {
       ...args,
       updatedAt: Date.now(),
     });
+
+    if (args.direction === "outbound") {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.followUpReminders.markActedForContact,
+        { contactId: args.contactId }
+      );
+    } else if (args.direction === "inbound") {
+      await ctx.db.patch(args.contactId, {
+        followUpEnabled: false,
+        followUpStoppedReason: "replied" as const,
+        updatedAt: Date.now(),
+      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.followUpReminders.dismissAllForContact,
+        { contactId: args.contactId }
+      );
+    }
+
+    return messageId;
+  },
+});
+
+export const getByGmailMessageId = query({
+  args: { gmailMessageId: v.string() },
+  handler: async (ctx, { gmailMessageId }) => {
+    return await ctx.db
+      .query("outreachMessages")
+      .withIndex("by_gmail_message_id", (q) =>
+        q.eq("gmailMessageId", gmailMessageId)
+      )
+      .first();
   },
 });
 

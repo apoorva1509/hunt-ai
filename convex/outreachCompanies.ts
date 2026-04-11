@@ -1,7 +1,7 @@
 import { mutation, query, action } from "./_generated/server";
 import { v } from "convex/values";
-import { requirePerson } from "./helpers/auth";
-import { api } from "./_generated/api";
+import { requirePerson, getCurrentPerson } from "./helpers/auth";
+import { api, internal } from "./_generated/api";
 
 const statusValidator = v.union(
   v.literal("active"),
@@ -10,8 +10,11 @@ const statusValidator = v.union(
 );
 
 export const list = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: {},
+  handler: async (ctx) => {
+    const person = await getCurrentPerson(ctx);
+    if (!person) return [];
+    const userId = person.clerkTokenIdentifier!;
     return await ctx.db
       .query("outreachCompanies")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -94,6 +97,29 @@ export const update = mutation({
       if (val !== undefined) patch[k] = val;
     }
     await ctx.db.patch(id, patch);
+
+    // Auto-stop follow-ups for all contacts when company is closed
+    if (fields.status === "closed") {
+      const contacts = await ctx.db
+        .query("outreachContacts")
+        .withIndex("by_company", (q) => q.eq("companyId", id))
+        .collect();
+      const now = Date.now();
+      for (const contact of contacts) {
+        if (contact.followUpEnabled !== false) {
+          await ctx.db.patch(contact._id, {
+            followUpEnabled: false,
+            followUpStoppedReason: "closed",
+            updatedAt: now,
+          });
+          await ctx.scheduler.runAfter(
+            0,
+            internal.followUpReminders.dismissAllForContact,
+            { contactId: contact._id }
+          );
+        }
+      }
+    }
   },
 });
 
