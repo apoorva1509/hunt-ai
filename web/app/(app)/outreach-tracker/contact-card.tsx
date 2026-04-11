@@ -7,11 +7,14 @@ import { useAgent } from "@/components/providers/agent-provider";
 import {
   useOutreachMessages,
   useOutreachGuidance,
+  useFollowUpRemindersByContact,
 } from "@/hooks/use-outreach-tracker";
 import {
+  BellOff,
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  Linkedin,
   Mail,
   Phone,
   Plus,
@@ -24,7 +27,8 @@ import {
   CHANNEL_COLORS,
   GUIDANCE_CHANNELS,
 } from "./types";
-import { formatDate } from "./utils";
+import { formatDate, isOverdue } from "./utils";
+import { FollowUpBadge } from "./follow-up-badge";
 import { LogMessageDialog } from "./log-message-dialog";
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -45,8 +49,12 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
 
   const messages = useOutreachMessages(expanded ? contact._id : null);
   const guidance = useOutreachGuidance(expanded ? contact._id : null);
+  const reminders = useFollowUpRemindersByContact(contact._id);
+  const activeReminder = reminders?.find((r) => isOverdue(r));
   const upsertGuidance = useMutation(api.outreachGuidance.upsert);
   const removeContact = useMutation(api.outreachContacts.remove);
+  const dismissReminder = useMutation(api.followUpReminders.dismiss);
+  const stopFollowUp = useMutation(api.outreachContacts.stopFollowUp);
   const suggestFollowUp = useAction(api.outreachSuggest.suggestFollowUp);
   const { activeAgent } = useAgent();
 
@@ -91,7 +99,10 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">{contact.name}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">{contact.name}</p>
+              {activeReminder && <FollowUpBadge reminder={activeReminder} />}
+            </div>
             {contact.title && (
               <p className="text-xs text-zinc-500">{contact.title}</p>
             )}
@@ -195,6 +206,85 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
                   </div>
                 </div>
               )}
+
+              {/* Follow-up Actions */}
+              {activeReminder && !suggestion && (
+                <div className="mb-3 rounded-md border border-orange-200 bg-orange-50 p-3 dark:border-orange-800 dark:bg-orange-900/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
+                      Follow-up due &mdash;{" "}
+                      {activeReminder.channel === "email"
+                        ? "Email"
+                        : "LinkedIn"}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={handleSuggest}
+                      disabled={suggesting}
+                      className="flex items-center gap-1 rounded-md bg-purple-100 px-2 py-1 text-[11px] font-medium text-purple-700 hover:bg-purple-200 dark:bg-purple-900/40 dark:text-purple-300"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      Generate Follow-up
+                    </button>
+                    {contact.linkedinUrl &&
+                      activeReminder.channel !== "email" && (
+                        <button
+                          onClick={async () => {
+                            if (suggestion) {
+                              await navigator.clipboard.writeText(
+                                suggestion.message
+                              );
+                            }
+                            const linkedinUrl = contact.linkedinUrl!;
+                            const messagingUrl = linkedinUrl.includes(
+                              "/messaging/"
+                            )
+                              ? linkedinUrl
+                              : linkedinUrl.replace(/\/?$/, "") +
+                                "/overlay/messaging/";
+                            window.open(messagingUrl, "_blank");
+                          }}
+                          className="flex items-center gap-1 rounded-md bg-blue-100 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
+                        >
+                          <Linkedin className="h-3 w-3" />
+                          Open LinkedIn
+                        </button>
+                      )}
+                    <button
+                      onClick={() =>
+                        dismissReminder({ id: activeReminder._id })
+                      }
+                      className="flex items-center gap-1 rounded-md bg-zinc-200 px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-400"
+                    >
+                      Dismiss
+                    </button>
+                    <button
+                      onClick={() =>
+                        stopFollowUp({ id: contact._id, reason: "manual" })
+                      }
+                      className="flex items-center gap-1 rounded-md bg-red-100 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300"
+                    >
+                      <BellOff className="h-3 w-3" />
+                      Stop Follow-ups
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Follow-up stopped indicator */}
+              {contact.followUpEnabled === false &&
+                contact.followUpStoppedReason && (
+                  <div className="mb-3 flex items-center gap-1.5 text-xs text-zinc-400">
+                    <BellOff className="h-3 w-3" />
+                    Follow-ups stopped:{" "}
+                    {contact.followUpStoppedReason === "replied"
+                      ? "Contact replied"
+                      : contact.followUpStoppedReason === "closed"
+                        ? "Company closed"
+                        : "Stopped manually"}
+                  </div>
+                )}
 
               {/* Message list */}
               {messages && messages.length > 0 ? (
