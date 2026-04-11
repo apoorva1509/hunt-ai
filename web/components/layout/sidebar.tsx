@@ -10,6 +10,8 @@ import {
   Play,
   Settings,
   LayoutDashboard,
+  LinkIcon,
+  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgent } from "@/components/providers/agent-provider";
@@ -19,7 +21,9 @@ const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/profile", label: "Profile", icon: User },
   { href: "/leads", label: "Leads", icon: Briefcase },
+  { href: "/tracker", label: "Tracker", icon: LinkIcon },
   { href: "/outreach", label: "Outreach", icon: Send },
+  { href: "/outreach-tracker", label: "Outreach CRM", icon: Target },
   { href: "/resumes", label: "Resumes", icon: FileText },
   { href: "/pipeline", label: "Pipeline", icon: Play },
   { href: "/settings", label: "Settings", icon: Settings },
