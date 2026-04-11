@@ -321,6 +321,14 @@ export default defineSchema({
       v.literal("linkedin")
     ),
     apolloData: v.optional(v.any()),
+    followUpEnabled: v.optional(v.boolean()),
+    followUpStoppedReason: v.optional(
+      v.union(
+        v.literal("manual"),
+        v.literal("replied"),
+        v.literal("closed")
+      )
+    ),
     updatedAt: v.number(),
   })
     .index("by_company", ["companyId"]),
@@ -351,10 +359,13 @@ export default defineSchema({
     body: v.string(),
     sentAt: v.number(),
     direction: v.union(v.literal("outbound"), v.literal("inbound")),
+    gmailMessageId: v.optional(v.string()),
+    gmailThreadId: v.optional(v.string()),
     updatedAt: v.number(),
   })
     .index("by_contact", ["contactId"])
-    .index("by_company", ["companyId"]),
+    .index("by_company", ["companyId"])
+    .index("by_gmail_message_id", ["gmailMessageId"]),
 
   outreachGuidance: defineTable({
     contactId: v.id("outreachContacts"),
@@ -368,4 +379,27 @@ export default defineSchema({
   })
     .index("by_contact", ["contactId"])
     .index("by_contact_and_channel", ["contactId", "channel"]),
+
+  followUpReminders: defineTable({
+    contactId: v.id("outreachContacts"),
+    companyId: v.id("outreachCompanies"),
+    channel: v.union(
+      v.literal("linkedin_dm"),
+      v.literal("linkedin_connection"),
+      v.literal("email")
+    ),
+    dueAt: v.number(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("notified"),
+      v.literal("acted"),
+      v.literal("dismissed")
+    ),
+    lastOutboundMessageId: v.optional(v.id("outreachMessages")),
+    updatedAt: v.number(),
+  })
+    .index("by_contact", ["contactId"])
+    .index("by_status", ["status"])
+    .index("by_company", ["companyId"])
+    .index("by_due", ["dueAt"]),
 });
