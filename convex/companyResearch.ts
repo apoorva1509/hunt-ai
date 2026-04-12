@@ -119,9 +119,10 @@ export const discoverJobs = internalAction({
     companyId: v.id("outreachCompanies"),
     companyName: v.string(),
     domain: v.optional(v.string()),
+    linkedinUid: v.optional(v.string()),
     isYcBacked: v.boolean(),
   },
-  handler: async (ctx, { companyId, companyName, domain, isYcBacked }) => {
+  handler: async (ctx, { companyId, companyName, domain, linkedinUid, isYcBacked }) => {
     type JobPayload = {
       companyId: typeof companyId;
       title: string;
@@ -135,8 +136,44 @@ export const discoverJobs = internalAction({
     console.log(`\n[JOBS] ========== Starting job discovery for "${companyName}" ==========`);
     console.log(`[JOBS] Domain: ${domain || "unknown"}`);
 
+    // ── Source 0: LinkedIn Public Jobs (best source, no auth needed) ──
+    if (linkedinUid) {
+      try {
+        console.log(`[JOBS] Trying LinkedIn public jobs with company ID: ${linkedinUid}`);
+        const liUrl = `https://www.linkedin.com/jobs/search/?f_C=${linkedinUid}&geoId=92000000&position=1&pageNum=0`;
+        const liRes = await fetch(liUrl, {
+          headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+        });
+        if (liRes.ok) {
+          const html = await liRes.text();
+          const titleMatches = [...html.matchAll(/<h3[^>]*class="base-search-card__title[^"]*"[^>]*>([^<]+)<\/h3>/g)];
+          const linkMatches = [...html.matchAll(/<a[^>]*class="base-card__full-link[^"]*"[^>]*href="([^"]+)"/g)];
+          const locationMatches = [...html.matchAll(/<span[^>]*class="job-search-card__location[^"]*"[^>]*>([^<]+)<\/span>/g)];
+
+          for (let i = 0; i < Math.min(titleMatches.length, 20); i++) {
+            const title = titleMatches[i][1].trim();
+            const url = linkMatches[i]?.[1]?.trim() || "";
+            const location = locationMatches[i]?.[1]?.trim();
+            if (title && url) {
+              discovered.push({ companyId, title, url, source: "linkedin", location });
+            }
+          }
+          console.log(`[JOBS] ✅ LinkedIn public: ${discovered.length} jobs found`);
+        } else {
+          console.log(`[JOBS] ❌ LinkedIn public: ${liRes.status}`);
+        }
+      } catch (e: any) {
+        console.log(`[JOBS] ❌ LinkedIn public: ${e.message}`);
+      }
+    }
+
     if (!domain) {
-      console.log(`[JOBS] No domain — skipping ATS and careers scraping`);
+      if (discovered.length === 0) {
+        console.log(`[JOBS] No domain and no LinkedIn jobs — skipping ATS`);
+      }
+      if (discovered.length > 0) {
+        await ctx.runMutation(internal.outreachJobs.batchCreate, { jobs: discovered });
+      }
       await ctx.runMutation(internal.companyResearch.finalizeResearch, { companyId });
       return;
     }
@@ -549,6 +586,8 @@ export const researchCompany = action({
     let linkedinUrl = company.linkedinUrl;
     let websiteUrl = company.websiteUrl;
 
+    let linkedinUid: string | undefined;
+
     console.log(`[RESEARCH] Company: "${company.name}"`);
     console.log(`[RESEARCH] Existing: domain=${domain}, linkedin=${linkedinUrl}, website=${websiteUrl}`);
 
@@ -600,9 +639,12 @@ export const researchCompany = action({
             linkedinUrl = linkedinUrl || org.linkedin_url;
             websiteUrl = websiteUrl || (org.website_url ? org.website_url : domain ? `https://${domain}` : undefined);
 
+            linkedinUid = org.linkedin_uid ? String(org.linkedin_uid) : undefined;
+
             console.log(`[RESEARCH] ✅ Apollo org enriched:`);
             console.log(`[RESEARCH]   Domain: ${domain}`);
             console.log(`[RESEARCH]   LinkedIn: ${linkedinUrl}`);
+            console.log(`[RESEARCH]   LinkedIn UID: ${linkedinUid || "unknown"}`);
             console.log(`[RESEARCH]   Website: ${websiteUrl}`);
             console.log(`[RESEARCH]   Employees: ${org.estimated_num_employees || "unknown"}`);
             console.log(`[RESEARCH]   Industry: ${org.industry || "unknown"}`);
@@ -684,13 +726,14 @@ export const researchCompany = action({
 
     // ── Step 3: Schedule parallel discovery ──
     console.log(`[RESEARCH] Scheduling parallel: discoverJobs + findContacts`);
-    console.log(`[RESEARCH] → Jobs: domain=${domain}, isYcBacked=${isYcBacked}`);
+    console.log(`[RESEARCH] → Jobs: domain=${domain}, linkedinUid=${linkedinUid}, isYcBacked=${isYcBacked}`);
     console.log(`[RESEARCH] → Contacts: companyName="${company.name}", domain=${domain}`);
 
     await ctx.scheduler.runAfter(0, internal.companyResearch.discoverJobs, {
       companyId,
       companyName: company.name,
       domain,
+      linkedinUid,
       isYcBacked,
     });
 
