@@ -26,6 +26,8 @@ import {
   CHANNEL_LABELS,
   CHANNEL_COLORS,
   GUIDANCE_CHANNELS,
+  TIER_LABELS,
+  TIER_COLORS,
 } from "./types";
 import { formatDate, isOverdue } from "./utils";
 import { FollowUpBadge } from "./follow-up-badge";
@@ -87,17 +89,25 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
               <ChevronRight className="h-3.5 w-3.5" />
             )}
           </span>
-          {contact.profilePictureUrl ? (
-            <img
-              src={contact.profilePictureUrl}
-              alt={contact.name}
-              className="h-8 w-8 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
-              {contact.name.charAt(0)}
-            </div>
-          )}
+          {(() => {
+            const enrichedCount = [contact.email, contact.linkedinUrl, contact.phone].filter(Boolean).length;
+            const ringClass = enrichedCount >= 3
+              ? "ring-2 ring-green-400"
+              : enrichedCount === 2
+                ? "ring-2 ring-amber-400"
+                : "";
+            return contact.profilePictureUrl ? (
+              <img
+                src={contact.profilePictureUrl}
+                alt={contact.name}
+                className={`h-8 w-8 rounded-full object-cover ${ringClass}`}
+              />
+            ) : (
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300 ${ringClass}`}>
+                {contact.name.charAt(0)}
+              </div>
+            );
+          })()}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium">{contact.name}</p>
@@ -134,6 +144,11 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
             <span className="rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
               {contact.source}
             </span>
+            {contact.tier && (
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${TIER_COLORS[contact.tier]}`}>
+                {TIER_LABELS[contact.tier]}
+              </span>
+            )}
           </div>
         </button>
 
