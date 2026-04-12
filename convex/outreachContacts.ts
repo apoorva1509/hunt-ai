@@ -106,6 +106,24 @@ export const listAll = query({
   },
 });
 
+export const createFromResearch = internalMutation({
+  args: {
+    companyId: v.id("outreachCompanies"),
+    name: v.string(),
+    title: v.optional(v.string()),
+    linkedinUrl: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    profilePictureUrl: v.optional(v.string()),
+    headline: v.optional(v.string()),
+    source: v.union(v.literal("manual"), v.literal("apollo"), v.literal("linkedin")),
+    tier: v.optional(v.union(v.literal("tier1"), v.literal("tier2"), v.literal("tier3"))),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("outreachContacts", { ...args, updatedAt: Date.now() });
+  },
+});
+
 export const setLinkedinUrl = internalMutation({
   args: {
     id: v.id("outreachContacts"),
