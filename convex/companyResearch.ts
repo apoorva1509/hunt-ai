@@ -144,71 +144,12 @@ export const discoverJobs = internalAction({
     };
 
     const discovered: JobPayload[] = [];
+    let detectedAtsSlug: string | null = null;
+    let detectedAtsType: string | null = null;
     console.log(`[discoverJobs] Starting for ${companyName}, domain=${domain}`);
 
-    // ── Source 1: Greenhouse API ──
+    // ── Source 1: Careers page scraping (try real site first) ──
     if (domain) {
-      const ghSlugs = [
-        domain.split(".")[0],
-        companyName.toLowerCase().replace(/[^a-z0-9]/g, ""),
-        companyName.toLowerCase().replace(/\s+/g, ""),
-      ];
-      for (const slug of [...new Set(ghSlugs)]) {
-        try {
-          const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${slug}/jobs`, {
-            headers: { "User-Agent": "Mozilla/5.0" },
-          });
-          if (res.ok) {
-            const data = await res.json();
-            for (const job of (data.jobs || []).slice(0, 20)) {
-              discovered.push({
-                companyId,
-                title: job.title,
-                url: job.absolute_url || `https://boards.greenhouse.io/${slug}/jobs/${job.id}`,
-                source: "greenhouse",
-                location: job.location?.name,
-              });
-            }
-            console.log(`[discoverJobs] Greenhouse found ${data.jobs?.length || 0} jobs`);
-            break;
-          }
-        } catch { /* try next slug */ }
-      }
-    }
-
-    // ── Source 2: Lever API ──
-    if (domain && discovered.length === 0) {
-      const leverSlugs = [
-        domain.split(".")[0],
-        companyName.toLowerCase().replace(/[^a-z0-9]/g, ""),
-      ];
-      for (const slug of [...new Set(leverSlugs)]) {
-        try {
-          const res = await fetch(`https://api.lever.co/v0/postings/${slug}?mode=json`, {
-            headers: { "User-Agent": "Mozilla/5.0" },
-          });
-          if (res.ok) {
-            const jobs = await res.json();
-            if (Array.isArray(jobs)) {
-              for (const job of jobs.slice(0, 20)) {
-                discovered.push({
-                  companyId,
-                  title: job.text,
-                  url: job.hostedUrl || job.applyUrl,
-                  source: "lever",
-                  location: job.categories?.location,
-                });
-              }
-              console.log(`[discoverJobs] Lever found ${jobs.length} jobs`);
-              break;
-            }
-          }
-        } catch { /* try next slug */ }
-      }
-    }
-
-    // ── Source 3: Careers page scraping ──
-    if (domain && discovered.length === 0) {
       const urlsToTry = careersUrl
         ? [careersUrl]
         : [
@@ -231,13 +172,30 @@ export const discoverJobs = internalAction({
           const finalUrl = res.url;
           console.log(`[discoverJobs] Scraping ${finalUrl} (${html.length} bytes)`);
 
-          // Detect ATS redirects
+          // Detect ATS from page content or redirect
           let atsSource: JobPayload["source"] = "careers_page";
-          if (finalUrl.includes("greenhouse.io") || html.includes("boards.greenhouse.io")) {
+
+          // Greenhouse detection
+          const ghMatch = html.match(/boards\.greenhouse\.io\/(\w+)/) ||
+            finalUrl.match(/boards\.greenhouse\.io\/(\w+)/);
+          if (ghMatch) {
             atsSource = "greenhouse";
-          } else if (finalUrl.includes("lever.co") || html.includes("jobs.lever.co")) {
+            detectedAtsSlug = ghMatch[1];
+            detectedAtsType = "greenhouse";
+            console.log(`[discoverJobs] Detected Greenhouse board: ${detectedAtsSlug}`);
+          }
+
+          // Lever detection
+          const leverMatch = html.match(/jobs\.lever\.co\/([^/"'\s]+)/) ||
+            finalUrl.match(/jobs\.lever\.co\/([^/"'\s]+)/);
+          if (!detectedAtsSlug && leverMatch) {
             atsSource = "lever";
-          } else if (finalUrl.includes("ashbyhq.com") || html.includes("ashbyhq.com")) {
+            detectedAtsSlug = leverMatch[1];
+            detectedAtsType = "lever";
+            console.log(`[discoverJobs] Detected Lever board: ${detectedAtsSlug}`);
+          }
+
+          if (finalUrl.includes("ashbyhq.com") || html.includes("ashbyhq.com")) {
             atsSource = "ashby";
           } else if (finalUrl.includes("workable.com") || html.includes("workable.com")) {
             atsSource = "workable";
@@ -295,7 +253,62 @@ export const discoverJobs = internalAction({
       }
     }
 
-    // ── Source 4: YC Jobs ──
+    // ── Source 2: ATS API (only if detected from careers page) ──
+    if (detectedAtsSlug && discovered.length === 0) {
+      if (detectedAtsType === "greenhouse") {
+        try {
+          console.log(`[discoverJobs] Fetching Greenhouse API for slug: ${detectedAtsSlug}`);
+          const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${detectedAtsSlug}/jobs`, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const realJobs = (data.jobs || []).filter((j: any) =>
+              // Filter out test jobs
+              !/\btest\b/i.test(j.title) && !/\bEA\b/.test(j.title) && j.title.length > 3
+            );
+            for (const job of realJobs.slice(0, 20)) {
+              discovered.push({
+                companyId,
+                title: job.title,
+                url: job.absolute_url || `https://boards.greenhouse.io/${detectedAtsSlug}/jobs/${job.id}`,
+                source: "greenhouse",
+                location: job.location?.name,
+              });
+            }
+            console.log(`[discoverJobs] Greenhouse API: ${data.jobs?.length || 0} total, ${realJobs.length} after filtering, ${discovered.length} saved`);
+          }
+        } catch (e: any) {
+          console.log(`[discoverJobs] Greenhouse API failed: ${e.message}`);
+        }
+      } else if (detectedAtsType === "lever") {
+        try {
+          console.log(`[discoverJobs] Fetching Lever API for slug: ${detectedAtsSlug}`);
+          const res = await fetch(`https://api.lever.co/v0/postings/${detectedAtsSlug}?mode=json`, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+          });
+          if (res.ok) {
+            const jobs = await res.json();
+            if (Array.isArray(jobs)) {
+              for (const job of jobs.slice(0, 20)) {
+                discovered.push({
+                  companyId,
+                  title: job.text,
+                  url: job.hostedUrl || job.applyUrl,
+                  source: "lever",
+                  location: job.categories?.location,
+                });
+              }
+              console.log(`[discoverJobs] Lever API: ${jobs.length} jobs found`);
+            }
+          }
+        } catch (e: any) {
+          console.log(`[discoverJobs] Lever API failed: ${e.message}`);
+        }
+      }
+    }
+
+    // ── Source 3: YC Jobs ──
     if (isYcBacked) {
       try {
         const ycRes = await fetch(
