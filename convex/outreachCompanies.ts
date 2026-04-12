@@ -149,6 +149,16 @@ export const remove = mutation({
       .withIndex("by_company", (q) => q.eq("companyId", id))
       .collect();
     for (const step of steps) await ctx.db.delete(step._id);
+    const jobs = await ctx.db
+      .query("outreachJobs")
+      .withIndex("by_company", (q) => q.eq("companyId", id))
+      .collect();
+    for (const job of jobs) await ctx.db.delete(job._id);
+    const reminders = await ctx.db
+      .query("followUpReminders")
+      .withIndex("by_company", (q) => q.eq("companyId", id))
+      .collect();
+    for (const r of reminders) await ctx.db.delete(r._id);
     await ctx.db.delete(id);
   },
 });

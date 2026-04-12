@@ -153,12 +153,34 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
                   </p>
                 )}
               </div>
-              <div className="text-right shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 {progress.total > 0 && (
                   <p className="text-sm font-medium text-zinc-500">
                     {progress.done}/{progress.total} steps
                   </p>
                 )}
+                {company.websiteUrl && (
+                  <a
+                    href={company.websiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-zinc-400 hover:text-zinc-600"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`Delete ${company.name} and all its jobs, contacts, and messages?`)) {
+                      removeCompany({ id: company._id });
+                    }
+                  }}
+                  className="text-zinc-400 hover:text-red-500 transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
           </div>
