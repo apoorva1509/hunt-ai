@@ -56,3 +56,17 @@ export function useFollowUpRemindersByContact(
 export function useOverdueCount() {
   return useQuery(api.followUpReminders.countOverdue, {});
 }
+
+export function useOutreachJobs(companyId: Id<"outreachCompanies"> | null) {
+  return useQuery(
+    api.outreachJobs.listByCompany,
+    companyId ? { companyId } : "skip"
+  );
+}
+
+export function useJobCounts(companyId: Id<"outreachCompanies"> | null) {
+  return useQuery(
+    api.outreachJobs.countByCompany,
+    companyId ? { companyId } : "skip"
+  );
+}
