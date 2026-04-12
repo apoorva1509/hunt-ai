@@ -301,6 +301,16 @@ export default defineSchema({
       v.literal("closed")
     ),
     roleAppliedFor: v.optional(v.string()),
+    employeeCount: v.optional(v.number()),
+    industry: v.optional(v.string()),
+    careersUrl: v.optional(v.string()),
+    researchStatus: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("researching"),
+      v.literal("done"),
+      v.literal("failed")
+    )),
+    researchSummary: v.optional(v.string()),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
@@ -329,6 +339,11 @@ export default defineSchema({
         v.literal("closed")
       )
     ),
+    tier: v.optional(v.union(
+      v.literal("tier1"),
+      v.literal("tier2"),
+      v.literal("tier3")
+    )),
     updatedAt: v.number(),
   })
     .index("by_company", ["companyId"]),
@@ -402,4 +417,43 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_company", ["companyId"])
     .index("by_due", ["dueAt"]),
+
+  outreachJobs: defineTable({
+    companyId: v.id("outreachCompanies"),
+    title: v.string(),
+    url: v.string(),
+    source: v.union(
+      v.literal("linkedin"),
+      v.literal("careers_page"),
+      v.literal("greenhouse"),
+      v.literal("lever"),
+      v.literal("ashby"),
+      v.literal("workable"),
+      v.literal("yc"),
+      v.literal("wellfound"),
+      v.literal("instahyre"),
+      v.literal("naukri")
+    ),
+    location: v.optional(v.string()),
+    workMode: v.optional(v.union(
+      v.literal("remote"),
+      v.literal("hybrid"),
+      v.literal("onsite"),
+      v.literal("unknown")
+    )),
+    status: v.union(
+      v.literal("new"),
+      v.literal("applied"),
+      v.literal("skipped")
+    ),
+    description: v.optional(v.string()),
+    postedAt: v.optional(v.number()),
+    appliedAt: v.optional(v.number()),
+    appliedVia: v.optional(v.string()),
+    appliedNotes: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index("by_company", ["companyId"])
+    .index("by_status", ["status"])
+    .index("by_company_and_status", ["companyId", "status"]),
 });
