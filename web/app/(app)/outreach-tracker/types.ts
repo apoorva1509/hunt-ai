@@ -14,7 +14,14 @@ export interface OutreachCompany {
   status: "active" | "paused" | "closed";
   roleAppliedFor?: string;
   updatedAt: number;
+  employeeCount?: number;
+  industry?: string;
+  careersUrl?: string;
+  researchStatus?: "pending" | "researching" | "done" | "failed";
+  researchSummary?: string;
 }
+
+export type ContactTier = "tier1" | "tier2" | "tier3";
 
 export interface OutreachContact {
   _id: Id<"outreachContacts">;
@@ -30,6 +37,7 @@ export interface OutreachContact {
   followUpEnabled?: boolean;
   followUpStoppedReason?: FollowUpStoppedReason;
   updatedAt: number;
+  tier?: ContactTier;
 }
 
 export interface OutreachStep {
@@ -125,3 +133,86 @@ export const STOPPED_REASON_LABELS: Record<FollowUpStoppedReason, string> = {
   replied: "Contact replied",
   closed: "Company closed",
 };
+
+export type JobSource =
+  | "linkedin" | "careers_page" | "greenhouse" | "lever"
+  | "ashby" | "workable" | "yc" | "wellfound" | "instahyre" | "naukri";
+
+export type JobStatus = "new" | "applied" | "skipped";
+
+export interface OutreachJob {
+  _id: Id<"outreachJobs">;
+  companyId: Id<"outreachCompanies">;
+  title: string;
+  url: string;
+  source: JobSource;
+  location?: string;
+  workMode?: "remote" | "hybrid" | "onsite" | "unknown";
+  status: JobStatus;
+  description?: string;
+  postedAt?: number;
+  appliedAt?: number;
+  appliedVia?: string;
+  appliedNotes?: string;
+  updatedAt: number;
+}
+
+export const SOURCE_COLORS: Record<JobSource, string> = {
+  linkedin: "bg-[#0A66C2] text-white",
+  careers_page: "bg-emerald-500 text-white",
+  greenhouse: "bg-[#3AB549] text-white",
+  lever: "bg-[#5C6BC0] text-white",
+  ashby: "bg-[#6366F1] text-white",
+  workable: "bg-[#1DA1F2] text-white",
+  yc: "bg-[#F26522] text-white",
+  wellfound: "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-800",
+  instahyre: "bg-[#FF6B35] text-white",
+  naukri: "bg-[#457EFF] text-white",
+};
+
+export const SOURCE_LABELS: Record<JobSource, string> = {
+  linkedin: "LinkedIn",
+  careers_page: "Careers",
+  greenhouse: "Greenhouse",
+  lever: "Lever",
+  ashby: "Ashby",
+  workable: "Workable",
+  yc: "YC",
+  wellfound: "Wellfound",
+  instahyre: "Instahyre",
+  naukri: "Naukri",
+};
+
+export const SOURCE_BORDER_COLORS: Record<JobSource, string> = {
+  linkedin: "border-l-[#0A66C2]",
+  careers_page: "border-l-emerald-500",
+  greenhouse: "border-l-[#3AB549]",
+  lever: "border-l-[#5C6BC0]",
+  ashby: "border-l-[#6366F1]",
+  workable: "border-l-[#1DA1F2]",
+  yc: "border-l-[#F26522]",
+  wellfound: "border-l-zinc-800",
+  instahyre: "border-l-[#FF6B35]",
+  naukri: "border-l-[#457EFF]",
+};
+
+export const TIER_LABELS: Record<ContactTier, string> = {
+  tier1: "Decision Maker",
+  tier2: "Recruiter",
+  tier3: "Referral",
+};
+
+export const TIER_COLORS: Record<ContactTier, string> = {
+  tier1: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+  tier2: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  tier3: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+};
+
+export const APPLIED_VIA_OPTIONS = [
+  { key: "linkedin_easy_apply", label: "LinkedIn Easy Apply", color: "bg-[#0A66C2]" },
+  { key: "company_portal", label: "Company Portal", color: "bg-emerald-500" },
+  { key: "yc", label: "YC Portal", color: "bg-[#F26522]" },
+  { key: "referral", label: "Referral", color: "bg-purple-500" },
+  { key: "email", label: "Email", color: "bg-amber-500" },
+  { key: "other", label: "Other", color: "bg-zinc-500" },
+];
