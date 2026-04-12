@@ -403,6 +403,8 @@ export const findContacts = internalAction({
       }
 
       const data = await res.json();
+      console.log(`[findContacts] Apollo returned ${data.people?.length ?? 0} people`);
+
       const people: Array<{
         name?: string;
         first_name?: string;
@@ -436,8 +438,8 @@ export const findContacts = internalAction({
           tier: assignedTier,
         });
       }
-    } catch {
-      // Apollo search failed — finalize anyway
+    } catch (e: any) {
+      console.error(`[findContacts] Apollo search failed:`, e.message);
     }
 
     await ctx.runMutation(internal.companyResearch.finalizeResearch, { companyId });
@@ -452,6 +454,11 @@ export const researchCompany = action({
     input: v.optional(v.string()),
   },
   handler: async (ctx, { companyId, input }) => {
+    console.log(`\n========================================`);
+    console.log(`[RESEARCH] Starting research for companyId=${companyId}`);
+    console.log(`[RESEARCH] Input: "${input}"`);
+    console.log(`========================================`);
+
     // Set status to researching
     await ctx.runMutation(internal.companyResearch.updateResearchStatus, {
       companyId,
@@ -466,44 +473,108 @@ export const researchCompany = action({
     let linkedinUrl = company.linkedinUrl;
     let websiteUrl = company.websiteUrl;
 
+    console.log(`[RESEARCH] Company: ${company.name}, existing domain=${domain}, linkedinUrl=${linkedinUrl}, websiteUrl=${websiteUrl}`);
+
     // Resolve identity from input if provided
     if (input) {
       try {
         const parsed = new URL(input.startsWith("http") ? input : `https://${input}`);
         if (parsed.hostname.includes("linkedin.com")) {
           linkedinUrl = input.startsWith("http") ? input : `https://${input}`;
+          console.log(`[RESEARCH] Detected LinkedIn URL: ${linkedinUrl}`);
+
+          // Extract domain from LinkedIn company page
+          if (!domain) {
+            try {
+              console.log(`[RESEARCH] Fetching LinkedIn page to find company website...`);
+              const liRes = await fetch(linkedinUrl, {
+                headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
+                redirect: "follow",
+              });
+              if (liRes.ok) {
+                const html = await liRes.text();
+                // Try to find website link in LinkedIn page
+                const websiteMatch = html.match(/(?:website|Website|"url")\s*[":]\s*["']?(https?:\/\/[^"'\s,<>]+)/);
+                if (websiteMatch) {
+                  const foundUrl = websiteMatch[1];
+                  const foundDomain = new URL(foundUrl).hostname.replace("www.", "");
+                  domain = foundDomain;
+                  websiteUrl = foundUrl;
+                  console.log(`[RESEARCH] Found website from LinkedIn: ${foundUrl} → domain=${domain}`);
+                }
+              }
+            } catch (e: any) {
+              console.log(`[RESEARCH] LinkedIn scrape failed: ${e.message}`);
+            }
+
+            // Fallback: guess domain from company name
+            if (!domain) {
+              const guessedDomain = company.name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
+              console.log(`[RESEARCH] Guessing domain: ${guessedDomain}`);
+              try {
+                const testRes = await fetch(`https://${guessedDomain}`, {
+                  method: "HEAD",
+                  headers: { "User-Agent": "Mozilla/5.0" },
+                  redirect: "follow",
+                });
+                if (testRes.ok || testRes.status === 301 || testRes.status === 302) {
+                  domain = guessedDomain;
+                  websiteUrl = `https://${guessedDomain}`;
+                  console.log(`[RESEARCH] Guessed domain confirmed: ${domain}`);
+                } else {
+                  console.log(`[RESEARCH] Guessed domain failed: ${testRes.status}`);
+                }
+              } catch {
+                console.log(`[RESEARCH] Guessed domain unreachable: ${guessedDomain}`);
+              }
+            }
+          }
         } else {
           websiteUrl = input.startsWith("http") ? input : `https://${input}`;
           domain = parsed.hostname.replace("www.", "");
+          console.log(`[RESEARCH] Detected website URL: ${websiteUrl} → domain=${domain}`);
         }
       } catch {
-        // input is a plain name — keep existing fields
+        console.log(`[RESEARCH] Input is plain company name: "${input}"`);
+        // Guess domain from company name
+        if (!domain) {
+          const guessedDomain = input.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
+          console.log(`[RESEARCH] Guessing domain: ${guessedDomain}`);
+          try {
+            const testRes = await fetch(`https://${guessedDomain}`, {
+              method: "HEAD",
+              headers: { "User-Agent": "Mozilla/5.0" },
+              redirect: "follow",
+            });
+            if (testRes.ok || testRes.status === 301 || testRes.status === 302) {
+              domain = guessedDomain;
+              websiteUrl = `https://${guessedDomain}`;
+              console.log(`[RESEARCH] Guessed domain confirmed: ${domain}`);
+            }
+          } catch {
+            console.log(`[RESEARCH] Guessed domain unreachable: ${guessedDomain}`);
+          }
+        }
       }
     }
 
-    // Enrich with Clearbit logo if we have a domain
-    if (domain && !company.logoUrl) {
-      const logoUrl = `https://logo.clearbit.com/${domain}`;
-      await ctx.runMutation(internal.companyResearch.enrichCompany, {
-        companyId,
-        domain,
-        logoUrl,
-        linkedinUrl,
-        websiteUrl,
-      });
-    } else if (domain || linkedinUrl || websiteUrl) {
-      await ctx.runMutation(internal.companyResearch.enrichCompany, {
-        companyId,
-        domain,
-        linkedinUrl,
-        websiteUrl,
-      });
-    }
+    // Enrich company with resolved data
+    const logoUrl = domain ? `https://logo.clearbit.com/${domain}` : undefined;
+    console.log(`[RESEARCH] Enriching: domain=${domain}, logoUrl=${logoUrl ? "yes" : "no"}, linkedinUrl=${linkedinUrl ? "yes" : "no"}`);
+
+    await ctx.runMutation(internal.companyResearch.enrichCompany, {
+      companyId,
+      domain,
+      logoUrl,
+      linkedinUrl,
+      websiteUrl,
+    });
 
     // Check YC backing
     let isYcBacked = company.isYcBacked;
-    if (!isYcBacked && domain) {
+    if (!isYcBacked) {
       try {
+        console.log(`[RESEARCH] Checking YC for "${company.name}"...`);
         const ycRes = await fetch(
           `https://www.ycombinator.com/companies?q=${encodeURIComponent(company.name)}`,
           { headers: { "User-Agent": "Mozilla/5.0" } }
@@ -511,6 +582,7 @@ export const researchCompany = action({
         if (ycRes.ok) {
           const html = await ycRes.text();
           isYcBacked = html.toLowerCase().includes(company.name.toLowerCase());
+          console.log(`[RESEARCH] YC backed: ${isYcBacked}`);
           if (isYcBacked) {
             await ctx.runMutation(internal.companyResearch.enrichCompany, {
               companyId,
@@ -519,9 +591,13 @@ export const researchCompany = action({
           }
         }
       } catch {
-        // YC check failed
+        console.log(`[RESEARCH] YC check failed`);
       }
     }
+
+    console.log(`[RESEARCH] Scheduling parallel: discoverJobs + findContacts`);
+    console.log(`[RESEARCH] → discoverJobs: domain=${domain}, isYcBacked=${isYcBacked}`);
+    console.log(`[RESEARCH] → findContacts: domain=${domain}`);
 
     // Schedule job discovery and contact finding in parallel
     await ctx.scheduler.runAfter(0, internal.companyResearch.discoverJobs, {
@@ -539,5 +615,7 @@ export const researchCompany = action({
       domain,
       tier: "tier1",
     });
+
+    console.log(`[RESEARCH] Research action complete — parallel tasks scheduled`);
   },
 });
