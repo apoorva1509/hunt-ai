@@ -506,14 +506,26 @@ export const researchCompany = action({
               });
               if (liRes.ok) {
                 const html = await liRes.text();
-                // Try to find website link in LinkedIn page
-                const websiteMatch = html.match(/(?:website|Website|"url")\s*[":]\s*["']?(https?:\/\/[^"'\s,<>]+)/);
-                if (websiteMatch) {
-                  const foundUrl = websiteMatch[1];
-                  const foundDomain = new URL(foundUrl).hostname.replace("www.", "");
+                // Try to find external website link (NOT linkedin.com itself)
+                const urlMatches = html.matchAll(/https?:\/\/([a-z0-9][a-z0-9.-]+\.[a-z]{2,})\/?[^"'\s]*/gi);
+                for (const m of urlMatches) {
+                  const foundDomain = m[1].toLowerCase().replace("www.", "");
+                  // Skip LinkedIn, social media, CDN, and tracking domains
+                  if (
+                    foundDomain.includes("linkedin.com") ||
+                    foundDomain.includes("facebook.com") ||
+                    foundDomain.includes("twitter.com") ||
+                    foundDomain.includes("google.com") ||
+                    foundDomain.includes("licdn.com") ||
+                    foundDomain.includes("cloudfront.net") ||
+                    foundDomain.includes("amazonaws.com") ||
+                    foundDomain.includes("doubleclick.net") ||
+                    foundDomain.includes("gstatic.com")
+                  ) continue;
                   domain = foundDomain;
-                  websiteUrl = foundUrl;
-                  console.log(`[RESEARCH] Found website from LinkedIn: ${foundUrl} → domain=${domain}`);
+                  websiteUrl = `https://${foundDomain}`;
+                  console.log(`[RESEARCH] Found website from LinkedIn page: ${foundDomain}`);
+                  break;
                 }
               }
             } catch (e: any) {
@@ -522,23 +534,30 @@ export const researchCompany = action({
 
             // Fallback: guess domain from company name
             if (!domain) {
-              const guessedDomain = company.name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
-              console.log(`[RESEARCH] Guessing domain: ${guessedDomain}`);
-              try {
-                const testRes = await fetch(`https://${guessedDomain}`, {
-                  method: "HEAD",
-                  headers: { "User-Agent": "Mozilla/5.0" },
-                  redirect: "follow",
-                });
-                if (testRes.ok || testRes.status === 301 || testRes.status === 302) {
-                  domain = guessedDomain;
-                  websiteUrl = `https://${guessedDomain}`;
-                  console.log(`[RESEARCH] Guessed domain confirmed: ${domain}`);
-                } else {
-                  console.log(`[RESEARCH] Guessed domain failed: ${testRes.status}`);
+              const guesses = [
+                company.name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com",
+                company.name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".io",
+                company.name.toLowerCase().replace(/\s+/g, "-") + ".com",
+              ];
+              for (const guessedDomain of guesses) {
+                console.log(`[RESEARCH] Trying domain guess: ${guessedDomain}`);
+                try {
+                  const testRes = await fetch(`https://${guessedDomain}`, {
+                    method: "HEAD",
+                    headers: { "User-Agent": "Mozilla/5.0" },
+                    redirect: "follow",
+                  });
+                  if (testRes.ok || testRes.status === 301 || testRes.status === 302) {
+                    domain = guessedDomain;
+                    websiteUrl = `https://${guessedDomain}`;
+                    console.log(`[RESEARCH] Domain confirmed: ${domain}`);
+                    break;
+                  } else {
+                    console.log(`[RESEARCH] Domain returned ${testRes.status}: ${guessedDomain}`);
+                  }
+                } catch {
+                  console.log(`[RESEARCH] Domain unreachable: ${guessedDomain}`);
                 }
-              } catch {
-                console.log(`[RESEARCH] Guessed domain unreachable: ${guessedDomain}`);
               }
             }
           }
@@ -551,21 +570,28 @@ export const researchCompany = action({
         console.log(`[RESEARCH] Input is plain company name: "${input}"`);
         // Guess domain from company name
         if (!domain) {
-          const guessedDomain = input.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
-          console.log(`[RESEARCH] Guessing domain: ${guessedDomain}`);
-          try {
-            const testRes = await fetch(`https://${guessedDomain}`, {
-              method: "HEAD",
-              headers: { "User-Agent": "Mozilla/5.0" },
-              redirect: "follow",
-            });
-            if (testRes.ok || testRes.status === 301 || testRes.status === 302) {
-              domain = guessedDomain;
-              websiteUrl = `https://${guessedDomain}`;
-              console.log(`[RESEARCH] Guessed domain confirmed: ${domain}`);
+          const guesses = [
+            input.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com",
+            input.toLowerCase().replace(/[^a-z0-9]/g, "") + ".io",
+            input.toLowerCase().replace(/\s+/g, "-") + ".com",
+          ];
+          for (const guessedDomain of guesses) {
+            console.log(`[RESEARCH] Trying domain guess: ${guessedDomain}`);
+            try {
+              const testRes = await fetch(`https://${guessedDomain}`, {
+                method: "HEAD",
+                headers: { "User-Agent": "Mozilla/5.0" },
+                redirect: "follow",
+              });
+              if (testRes.ok || testRes.status === 301 || testRes.status === 302) {
+                domain = guessedDomain;
+                websiteUrl = `https://${guessedDomain}`;
+                console.log(`[RESEARCH] Domain confirmed: ${domain}`);
+                break;
+              }
+            } catch {
+              console.log(`[RESEARCH] Domain unreachable: ${guessedDomain}`);
             }
-          } catch {
-            console.log(`[RESEARCH] Guessed domain unreachable: ${guessedDomain}`);
           }
         }
       }
