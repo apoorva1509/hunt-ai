@@ -437,91 +437,89 @@ export const findContacts = internalAction({
       return "tier1";
     };
 
-    // ── Apollo People Search ──
-    // KEY: Use q_organization_name (works WITHOUT domain) instead of q_organization_domains
-    try {
-      const searchBody: Record<string, unknown> = {
-        q_titles: targetTitles,
-        per_page: 10,
-      };
-
-      // Use organization name as primary search (works even without domain)
-      if (domain) {
-        searchBody.q_organization_domains = domain;
-        console.log(`[CONTACTS] Apollo search: domain="${domain}", titles=${targetTitles.length}`);
-      } else {
-        searchBody.q_organization_name = companyName;
-        console.log(`[CONTACTS] Apollo search: company name="${companyName}" (no domain), titles=${targetTitles.length}`);
-      }
-
-      const res = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Api-Key": apolloKey,
-        },
-        body: JSON.stringify(searchBody),
-      });
-
-      console.log(`[CONTACTS] Apollo response: ${res.status}`);
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        console.log(`[CONTACTS] ❌ Apollo error: ${res.status} — ${errText.slice(0, 200)}`);
-
-        // Retry with company name if domain search failed
-        if (domain) {
-          console.log(`[CONTACTS] Retrying with company name instead of domain...`);
-          const retryRes = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Api-Key": apolloKey,
-            },
-            body: JSON.stringify({
-              q_organization_name: companyName,
-              q_titles: targetTitles,
-              per_page: 10,
-            }),
-          });
-          console.log(`[CONTACTS] Apollo retry response: ${retryRes.status}`);
-
-          if (retryRes.ok) {
-            const retryData = await retryRes.json();
-            await processApolloResults(ctx, companyId, retryData.people || [], tierForTitle);
-          }
-        }
-
-        await ctx.runMutation(internal.companyResearch.finalizeResearch, { companyId });
-        return;
-      }
-
-      const data = await res.json();
-      const people = data.people || [];
-      console.log(`[CONTACTS] Apollo returned ${people.length} people`);
-
-      await processApolloResults(ctx, companyId, people, tierForTitle);
-    } catch (e: any) {
-      console.error(`[CONTACTS] ❌ Apollo search failed: ${e.message}`);
-    }
-
-    // ── Hunter.io fallback for emails (if we have domain) ──
+    // ── Source 1: Hunter.io domain search (25/month free, finds names + emails) ──
     const hunterKey = process.env.HUNTER_API_KEY;
     if (hunterKey && domain) {
       try {
-        console.log(`[CONTACTS] Trying Hunter.io for ${domain}`);
+        console.log(`[CONTACTS] Trying Hunter.io domain search for ${domain}`);
         const res = await fetch(
-          `https://api.hunter.io/v2/domain-search?domain=${domain}&api_key=${hunterKey}&limit=5`
+          `https://api.hunter.io/v2/domain-search?domain=${domain}&api_key=${hunterKey}&limit=10&type=personal`
         );
         if (res.ok) {
           const data = await res.json();
           const emails = data.data?.emails || [];
-          console.log(`[CONTACTS] Hunter.io found ${emails.length} emails`);
-          // These are supplementary — we'd need to match them to existing contacts
+          console.log(`[CONTACTS] Hunter.io found ${emails.length} people`);
+          for (const person of emails) {
+            const name = [person.first_name, person.last_name].filter(Boolean).join(" ");
+            if (!name) continue;
+            const assignedTier = tierForTitle(person.position || "");
+            console.log(`[CONTACTS] ✅ ${name} — ${person.position || "no title"} (${assignedTier}) | email=${person.value ? "✓" : "✗"} | linkedin=${person.linkedin ? "✓" : "✗"}`);
+            await ctx.runMutation(internal.outreachContacts.createFromResearch, {
+              companyId,
+              name,
+              title: person.position,
+              linkedinUrl: person.linkedin || undefined,
+              email: person.value,
+              source: "manual" as const,
+              tier: assignedTier,
+            });
+          }
+        } else {
+          console.log(`[CONTACTS] ❌ Hunter.io: ${res.status}`);
         }
-      } catch {
-        console.log(`[CONTACTS] ❌ Hunter.io failed`);
+      } catch (e: any) {
+        console.log(`[CONTACTS] ❌ Hunter.io failed: ${e.message}`);
       }
+    } else if (!hunterKey) {
+      console.log(`[CONTACTS] ⚠️ No HUNTER_API_KEY set — skipping Hunter.io`);
+    }
+
+    // ── Source 2: Apollo people search (if available on plan) ──
+    if (apolloKey) {
+      try {
+        const searchBody: Record<string, unknown> = {
+          q_titles: targetTitles,
+          per_page: 10,
+        };
+        if (domain) {
+          searchBody.q_organization_domains = domain;
+        } else {
+          searchBody.q_organization_name = companyName;
+        }
+        console.log(`[CONTACTS] Trying Apollo people search...`);
+
+        const res = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Api-Key": apolloKey,
+          },
+          body: JSON.stringify(searchBody),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const people = data.people || [];
+          console.log(`[CONTACTS] ✅ Apollo returned ${people.length} people`);
+          await processApolloResults(ctx, companyId, people, tierForTitle);
+        } else {
+          const errText = await res.text().catch(() => "");
+          if (errText.includes("free plan")) {
+            console.log(`[CONTACTS] ⚠️ Apollo people search not available on free plan — skipping`);
+          } else {
+            console.log(`[CONTACTS] ❌ Apollo: ${res.status} — ${errText.slice(0, 150)}`);
+          }
+        }
+      } catch (e: any) {
+        console.log(`[CONTACTS] ❌ Apollo failed: ${e.message}`);
+      }
+    }
+
+    // ── Source 3: Email pattern guessing (if we have domain but no contacts yet) ──
+    // Check how many contacts we found so far
+    const existingContacts = await ctx.runQuery(api.outreachContacts.listByCompany, { companyId });
+    if (existingContacts.length === 0 && domain) {
+      console.log(`[CONTACTS] No contacts found via APIs — try adding contacts manually with LinkedIn URLs`);
     }
 
     console.log(`[CONTACTS] ========== Contact discovery complete ==========\n`);
@@ -598,35 +596,60 @@ export const researchCompany = action({
     if (apolloKey && (!domain || !linkedinUrl)) {
       console.log(`[RESEARCH] Step 1: Apollo Organization Enrich`);
 
-      // Detect input type
-      let apolloQuery: Record<string, string> = {};
+      // Detect input type and resolve domain first (Apollo requires domain param)
       if (input?.includes("linkedin.com/company/")) {
         linkedinUrl = input.startsWith("http") ? input : `https://${input}`;
-        apolloQuery = { linkedin_url: linkedinUrl };
-        console.log(`[RESEARCH] → Using LinkedIn URL for Apollo: ${linkedinUrl}`);
+        console.log(`[RESEARCH] Detected LinkedIn URL: ${linkedinUrl}`);
       } else if (input && input.includes(".") && !input.includes(" ")) {
         const url = input.startsWith("http") ? input : `https://${input}`;
         try {
           domain = new URL(url).hostname.replace("www.", "");
           websiteUrl = url;
-          apolloQuery = { domain };
-          console.log(`[RESEARCH] → Using domain for Apollo: ${domain}`);
-        } catch {
-          apolloQuery = { name: input };
+          console.log(`[RESEARCH] Detected website URL: ${websiteUrl} → domain=${domain}`);
+        } catch { /* treat as name */ }
+      }
+
+      // If we still don't have a domain, guess it from company name
+      if (!domain) {
+        const nameForGuess = company.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const guesses = [`${nameForGuess}.com`, `${nameForGuess}.io`, `${nameForGuess}.ai`, `${nameForGuess}.co`];
+        for (const guess of guesses) {
+          try {
+            console.log(`[RESEARCH] Guessing domain: ${guess}`);
+            const testRes = await fetch(`https://${guess}`, {
+              method: "HEAD",
+              headers: { "User-Agent": "Mozilla/5.0" },
+              redirect: "follow",
+            });
+            if (testRes.ok || testRes.status === 301 || testRes.status === 302) {
+              domain = guess;
+              websiteUrl = `https://${guess}`;
+              console.log(`[RESEARCH] ✅ Domain confirmed: ${domain}`);
+              break;
+            }
+          } catch {
+            console.log(`[RESEARCH] ❌ Domain unreachable: ${guess}`);
+          }
         }
+      }
+
+      // Now call Apollo org enrich WITH domain (the only param it accepts)
+      if (domain) {
+        console.log(`[RESEARCH] Calling Apollo org enrich with domain=${domain}`);
       } else {
-        apolloQuery = { name: input || company.name };
-        console.log(`[RESEARCH] → Using company name for Apollo: ${apolloQuery.name}`);
+        console.log(`[RESEARCH] ⚠️ No domain found — skipping Apollo org enrich`);
       }
 
       try {
+        if (!domain) throw new Error("No domain to enrich");
+
         const orgRes = await fetch("https://api.apollo.io/api/v1/organizations/enrich", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-Api-Key": apolloKey,
           },
-          body: JSON.stringify(apolloQuery),
+          body: JSON.stringify({ domain }),
         });
 
         console.log(`[RESEARCH] Apollo org enrich response: ${orgRes.status}`);
@@ -672,34 +695,9 @@ export const researchCompany = action({
       }
     }
 
-    // Fallback: guess domain from company name
+    // Domain should already be resolved above. If still missing, log it.
     if (!domain) {
-      const guesses = [
-        company.name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com",
-        company.name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".io",
-      ];
-      for (const guess of guesses) {
-        try {
-          console.log(`[RESEARCH] Trying domain guess: ${guess}`);
-          const testRes = await fetch(`https://${guess}`, {
-            method: "HEAD",
-            headers: { "User-Agent": "Mozilla/5.0" },
-            redirect: "follow",
-          });
-          if (testRes.ok || testRes.status === 301 || testRes.status === 302) {
-            domain = guess;
-            websiteUrl = `https://${guess}`;
-            console.log(`[RESEARCH] ✅ Domain confirmed: ${domain}`);
-            await ctx.runMutation(internal.companyResearch.enrichCompany, {
-              companyId,
-              domain,
-              websiteUrl,
-              logoUrl: `https://logo.clearbit.com/${domain}`,
-            });
-            break;
-          }
-        } catch { /* try next */ }
-      }
+      console.log(`[RESEARCH] ⚠️ Could not determine domain for "${company.name}" — jobs and contacts will be limited`);
     }
 
     // ── Step 2: Check YC ──
