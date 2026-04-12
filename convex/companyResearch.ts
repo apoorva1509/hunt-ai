@@ -133,7 +133,7 @@ export const discoverJobs = internalAction({
     careersUrl: v.optional(v.string()),
     isYcBacked: v.boolean(),
   },
-  handler: async (ctx, { companyId, companyName, domain, linkedinUrl: _linkedinUrl, careersUrl, isYcBacked: _isYcBacked }) => {
+  handler: async (ctx, { companyId, companyName, domain, linkedinUrl: _linkedinUrl, careersUrl, isYcBacked }) => {
     type JobPayload = {
       companyId: typeof companyId;
       title: string;
@@ -144,83 +144,143 @@ export const discoverJobs = internalAction({
     };
 
     const discovered: JobPayload[] = [];
+    console.log(`[discoverJobs] Starting for ${companyName}, domain=${domain}`);
 
-    // Careers page scraping
+    // ── Source 1: Greenhouse API ──
     if (domain) {
+      const ghSlugs = [
+        domain.split(".")[0],
+        companyName.toLowerCase().replace(/[^a-z0-9]/g, ""),
+        companyName.toLowerCase().replace(/\s+/g, ""),
+      ];
+      for (const slug of [...new Set(ghSlugs)]) {
+        try {
+          const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${slug}/jobs`, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            for (const job of (data.jobs || []).slice(0, 20)) {
+              discovered.push({
+                companyId,
+                title: job.title,
+                url: job.absolute_url || `https://boards.greenhouse.io/${slug}/jobs/${job.id}`,
+                source: "greenhouse",
+                location: job.location?.name,
+              });
+            }
+            console.log(`[discoverJobs] Greenhouse found ${data.jobs?.length || 0} jobs`);
+            break;
+          }
+        } catch { /* try next slug */ }
+      }
+    }
+
+    // ── Source 2: Lever API ──
+    if (domain && discovered.length === 0) {
+      const leverSlugs = [
+        domain.split(".")[0],
+        companyName.toLowerCase().replace(/[^a-z0-9]/g, ""),
+      ];
+      for (const slug of [...new Set(leverSlugs)]) {
+        try {
+          const res = await fetch(`https://api.lever.co/v0/postings/${slug}?mode=json`, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+          });
+          if (res.ok) {
+            const jobs = await res.json();
+            if (Array.isArray(jobs)) {
+              for (const job of jobs.slice(0, 20)) {
+                discovered.push({
+                  companyId,
+                  title: job.text,
+                  url: job.hostedUrl || job.applyUrl,
+                  source: "lever",
+                  location: job.categories?.location,
+                });
+              }
+              console.log(`[discoverJobs] Lever found ${jobs.length} jobs`);
+              break;
+            }
+          }
+        } catch { /* try next slug */ }
+      }
+    }
+
+    // ── Source 3: Careers page scraping ──
+    if (domain && discovered.length === 0) {
       const urlsToTry = careersUrl
         ? [careersUrl]
         : [
             `https://${domain}/careers`,
             `https://${domain}/jobs`,
             `https://${domain}/open-positions`,
+            `https://www.${domain}/careers`,
+            `https://www.${domain}/jobs`,
           ];
 
       for (const url of urlsToTry) {
         try {
           const res = await fetch(url, {
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-            },
+            headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
             redirect: "follow",
           });
           if (!res.ok) continue;
 
           const html = await res.text();
           const finalUrl = res.url;
+          console.log(`[discoverJobs] Scraping ${finalUrl} (${html.length} bytes)`);
 
           // Detect ATS redirects
           let atsSource: JobPayload["source"] = "careers_page";
-          let atsJobsUrl: string | null = null;
-
-          if (finalUrl.includes("greenhouse.io") || html.includes("greenhouse.io/embed")) {
+          if (finalUrl.includes("greenhouse.io") || html.includes("boards.greenhouse.io")) {
             atsSource = "greenhouse";
-            const ghMatch = html.match(/https:\/\/boards\.greenhouse\.io\/[^"'\s]+/);
-            if (ghMatch) atsJobsUrl = ghMatch[0];
           } else if (finalUrl.includes("lever.co") || html.includes("jobs.lever.co")) {
             atsSource = "lever";
-            const leverMatch = html.match(/https:\/\/jobs\.lever\.co\/[^"'\s]+/);
-            if (leverMatch) atsJobsUrl = leverMatch[0];
           } else if (finalUrl.includes("ashbyhq.com") || html.includes("ashbyhq.com")) {
             atsSource = "ashby";
           } else if (finalUrl.includes("workable.com") || html.includes("workable.com")) {
             atsSource = "workable";
           }
 
-          // Extract job titles + links from common HTML patterns
-          const jobLinkPattern =
-            /<a[^>]+href=["']([^"']+)["'][^>]*>([^<]{10,120})<\/a>/gi;
-          let match: RegExpExecArray | null;
+          // Extract job links — look for anchors with job-like href patterns
+          const jobPatterns = [
+            /<a[^>]+href=["']([^"']*(?:\/jobs?\/|\/positions?\/|\/careers?\/|\/openings?\/|\/apply\/|greenhouse|lever|ashby|workable)[^"']*)["'][^>]*>([^<]{3,120})<\/a>/gi,
+            /<a[^>]+href=["']([^"']+)["'][^>]*>([^<]{10,120})<\/a>/gi,
+          ];
+
           const seenTitles = new Set<string>();
 
-          while ((match = jobLinkPattern.exec(html)) !== null) {
-            const href = match[1];
-            const text = match[2].trim().replace(/\s+/g, " ");
+          for (const pattern of jobPatterns) {
+            let match: RegExpExecArray | null;
+            while ((match = pattern.exec(html)) !== null) {
+              const href = match[1];
+              const text = match[2].trim().replace(/\s+/g, " ").replace(/&amp;/g, "&");
 
-            // Heuristic: skip navigation links, keep job-looking titles
-            if (text.split(" ").length < 2 || text.split(" ").length > 12) continue;
-            if (/about|blog|contact|privacy|terms|login|sign/i.test(text)) continue;
-            if (seenTitles.has(text.toLowerCase())) continue;
-            seenTitles.add(text.toLowerCase());
+              if (text.split(" ").length < 2 || text.split(" ").length > 15) continue;
+              if (/^(about|blog|contact|privacy|terms|login|sign|home|menu|nav|footer|cookie)/i.test(text)) continue;
+              if (seenTitles.has(text.toLowerCase())) continue;
+              seenTitles.add(text.toLowerCase());
 
-            const jobUrl = href.startsWith("http")
-              ? href
-              : href.startsWith("/")
-              ? `https://${domain}${href}`
-              : `${url}/${href}`;
+              const jobUrl = href.startsWith("http")
+                ? href
+                : href.startsWith("/")
+                ? `https://${new URL(finalUrl).hostname}${href}`
+                : `${finalUrl.replace(/\/?$/, "")}/${href}`;
 
-            discovered.push({
-              companyId,
-              title: text,
-              url: jobUrl,
-              source: atsSource,
-            });
+              discovered.push({
+                companyId,
+                title: text,
+                url: jobUrl,
+                source: atsSource,
+              });
 
-            if (discovered.length >= 20) break;
+              if (discovered.length >= 20) break;
+            }
+            if (discovered.length > 0) break;
           }
 
           if (discovered.length > 0) {
-            // Update careersUrl if we found it
             if (!careersUrl) {
               await ctx.runMutation(internal.companyResearch.enrichCompany, {
                 companyId,
@@ -229,17 +289,37 @@ export const discoverJobs = internalAction({
             }
             break;
           }
-
-          // Suppress unused variable warning
-          void atsJobsUrl;
         } catch {
           // Try next URL
         }
       }
     }
 
-    // LinkedIn jobs stub — returns empty (requires OAuth)
-    // YC / Wellfound stubs — returns empty for now
+    // ── Source 4: YC Jobs ──
+    if (isYcBacked) {
+      try {
+        const ycRes = await fetch(
+          `https://www.workatastartup.com/companies?q=${encodeURIComponent(companyName)}`,
+          { headers: { "User-Agent": "Mozilla/5.0" } }
+        );
+        if (ycRes.ok) {
+          const html = await ycRes.text();
+          const jobPattern = /<a[^>]+href=["'](\/jobs\/\d+)["'][^>]*>([^<]{5,120})<\/a>/gi;
+          let match: RegExpExecArray | null;
+          while ((match = jobPattern.exec(html)) !== null) {
+            discovered.push({
+              companyId,
+              title: match[2].trim(),
+              url: `https://www.workatastartup.com${match[1]}`,
+              source: "yc",
+            });
+          }
+          console.log(`[discoverJobs] YC found ${discovered.filter(j => j.source === "yc").length} jobs`);
+        }
+      } catch { /* YC scrape failed */ }
+    }
+
+    console.log(`[discoverJobs] Total discovered: ${discovered.length} jobs`);
 
     if (discovered.length > 0) {
       await ctx.runMutation(internal.outreachJobs.batchCreate, {
@@ -262,7 +342,10 @@ export const findContacts = internalAction({
   },
   handler: async (ctx, { companyId, companyName: _companyName, domain, tier }) => {
     const apolloKey = process.env.APOLLO_API_KEY;
+    console.log(`[findContacts] Starting, domain=${domain}, apolloKey=${apolloKey ? "set" : "missing"}`);
+
     if (!apolloKey || !domain) {
+      console.log(`[findContacts] Skipping — apolloKey=${!!apolloKey}, domain=${domain}`);
       await ctx.runMutation(internal.companyResearch.finalizeResearch, { companyId });
       return;
     }
@@ -284,8 +367,19 @@ export const findContacts = internalAction({
       "Technical Recruiter",
     ];
 
-    const targetTitles = tier === "tier2" ? tier2Titles : tier1Titles;
-    const contactTier = tier ?? "tier1";
+    // Search both tiers unless specifically requesting one
+    const targetTitles = tier === "tier2"
+      ? tier2Titles
+      : tier === "tier3"
+        ? ["Senior Engineer", "Staff Engineer", "Team Lead", "Principal Engineer"]
+        : [...tier1Titles, ...tier2Titles];
+
+    const tierForTitle = (title: string): "tier1" | "tier2" | "tier3" => {
+      if (tier === "tier3") return "tier3";
+      const t = title.toLowerCase();
+      if (tier2Titles.some((tt) => t.includes(tt.toLowerCase()))) return "tier2";
+      return "tier1";
+    };
 
     try {
       const res = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
@@ -300,6 +394,8 @@ export const findContacts = internalAction({
           per_page: 10,
         }),
       });
+
+      console.log(`[findContacts] Apollo response: ${res.status}`);
 
       if (!res.ok) {
         await ctx.runMutation(internal.companyResearch.finalizeResearch, { companyId });
@@ -325,6 +421,8 @@ export const findContacts = internalAction({
           [person.first_name, person.last_name].filter(Boolean).join(" ");
         if (!name) continue;
 
+        const assignedTier = tierForTitle(person.title || "");
+        console.log(`[findContacts] Found: ${name} — ${person.title} (${assignedTier}), email=${person.email ? "yes" : "no"}`);
         await ctx.runMutation(internal.outreachContacts.createFromResearch, {
           companyId,
           name,
@@ -335,7 +433,7 @@ export const findContacts = internalAction({
           profilePictureUrl: person.photo_url,
           headline: person.headline,
           source: "apollo",
-          tier: contactTier,
+          tier: assignedTier,
         });
       }
     } catch {
