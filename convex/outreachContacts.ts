@@ -124,6 +124,36 @@ export const createFromResearch = internalMutation({
   },
 });
 
+export const patchInternal = internalMutation({
+  args: {
+    id: v.id("outreachContacts"),
+    title: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    profilePictureUrl: v.optional(v.string()),
+    headline: v.optional(v.string()),
+    tier: v.optional(v.union(v.literal("tier1"), v.literal("tier2"), v.literal("tier3"))),
+    followUpEnabled: v.optional(v.boolean()),
+    followUpStoppedReason: v.optional(
+      v.union(v.literal("manual"), v.literal("replied"), v.literal("closed"))
+    ),
+  },
+  handler: async (ctx, { id, ...fields }) => {
+    const patch: Record<string, any> = { updatedAt: Date.now() };
+    for (const [k, val] of Object.entries(fields)) {
+      if (val !== undefined) patch[k] = val;
+    }
+    await ctx.db.patch(id, patch);
+  },
+});
+
+export const deleteInternal = internalMutation({
+  args: { id: v.id("outreachContacts") },
+  handler: async (ctx, { id }) => {
+    await ctx.db.delete(id);
+  },
+});
+
 export const setLinkedinUrl = internalMutation({
   args: {
     id: v.id("outreachContacts"),
