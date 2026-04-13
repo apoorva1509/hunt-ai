@@ -16,6 +16,37 @@ export const getMyCompany = query({
   },
 });
 
+export const findOrCreateByDomain = mutation({
+  args: {
+    domain: v.string(),
+    name: v.optional(v.string()),
+    linkedinUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, { domain, name, linkedinUrl }) => {
+    const existing = await ctx.db
+      .query("companies")
+      .withIndex("by_domain", (q) => q.eq("domain", domain))
+      .first();
+    if (existing) return existing._id;
+
+    return await ctx.db.insert("companies", {
+      domain,
+      name,
+      linkedinUrl,
+    });
+  },
+});
+
+export const getByDomain = query({
+  args: { domain: v.string() },
+  handler: async (ctx, { domain }) => {
+    return await ctx.db
+      .query("companies")
+      .withIndex("by_domain", (q) => q.eq("domain", domain))
+      .first();
+  },
+});
+
 export const saveCompany = mutation({
   args: {
     domain: v.string(),

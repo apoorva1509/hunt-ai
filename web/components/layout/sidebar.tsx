@@ -13,8 +13,6 @@ import {
   LinkIcon,
   Target,
   Building2,
-  LinkIcon,
-  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgent } from "@/components/providers/agent-provider";

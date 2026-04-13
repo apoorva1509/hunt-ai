@@ -213,6 +213,7 @@ Default modes are in `modes/` (English). Additional language-specific modes are 
 | Searches for new offers | `scan` |
 | Processes pending URLs | `pipeline` |
 | Batch processes offers | `batch` |
+| Drops LinkedIn screenshot | `linkedin-log` |
 
 ### CV Source of Truth
 
