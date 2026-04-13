@@ -4,6 +4,7 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { MessageSquare, AlertTriangle, Check, Clock, UserPlus } from "lucide-react";
+import type { ConnectionCardProps } from "./types";
 
 const TYPE_LABELS: Record<string, string> = {
   recruiter: "Recruiter",
@@ -20,11 +21,6 @@ const STATUS_STYLES: Record<string, string> = {
   accepted: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
   ignored: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
 };
-
-interface ConnectionCardProps {
-  connection: any;
-  personName?: string;
-}
 
 export function ConnectionCard({ connection, personName }: ConnectionCardProps) {
   const updateStatus = useMutation(api.connectionRequests.updateStatus);

@@ -2,6 +2,7 @@
 
 import { Briefcase, ExternalLink } from "lucide-react";
 import type { JobLeadData } from "@/lib/types";
+import type { ApplicationsSectionProps } from "./types";
 
 const STATUS_COLORS: Record<string, string> = {
   new: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
@@ -10,10 +11,6 @@ const STATUS_COLORS: Record<string, string> = {
   done: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
   skipped: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500",
 };
-
-interface ApplicationsSectionProps {
-  leads: any[];
-}
 
 export function ApplicationsSection({ leads }: ApplicationsSectionProps) {
   if (leads.length === 0) {
