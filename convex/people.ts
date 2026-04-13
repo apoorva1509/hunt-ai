@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
 
 export const ensurePerson = mutation({
   args: {},
@@ -59,5 +60,60 @@ export const getMyPerson = query({
         q.eq("clerkTokenIdentifier", identity.tokenIdentifier)
       )
       .first();
+  },
+});
+
+export const findOrCreate = mutation({
+  args: {
+    name: v.string(),
+    linkedinUrl: v.optional(v.string()),
+    email: v.optional(v.string()),
+  },
+  handler: async (ctx, { name, linkedinUrl, email }) => {
+    // Try to find by LinkedIn URL first
+    if (linkedinUrl) {
+      const existing = await ctx.db
+        .query("people")
+        .withIndex("by_linkedin", (q) => q.eq("linkedinUrl", linkedinUrl))
+        .first();
+      if (existing) return existing._id;
+    }
+
+    // Try to find by email
+    if (email) {
+      const existing = await ctx.db
+        .query("people")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .first();
+      if (existing) return existing._id;
+    }
+
+    // Create new person
+    return await ctx.db.insert("people", {
+      name,
+      linkedinUrl,
+      email,
+      source: "manual",
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const getById = query({
+  args: { personId: v.id("people") },
+  handler: async (ctx, { personId }) => {
+    return await ctx.db.get(personId);
+  },
+});
+
+export const getByIds = query({
+  args: { personIds: v.array(v.id("people")) },
+  handler: async (ctx, { personIds }) => {
+    const results = [];
+    for (const id of personIds) {
+      const person = await ctx.db.get(id);
+      if (person) results.push(person);
+    }
+    return results;
   },
 });
