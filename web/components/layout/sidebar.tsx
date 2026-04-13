@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   LinkIcon,
   Target,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgent } from "@/components/providers/agent-provider";
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/profile", label: "Profile", icon: User },
   { href: "/leads", label: "Leads", icon: Briefcase },
+  { href: "/companies", label: "Companies", icon: Building2 },
   { href: "/tracker", label: "Tracker", icon: LinkIcon },
   { href: "/outreach", label: "Outreach", icon: Send },
   { href: "/outreach-tracker", label: "Outreach CRM", icon: Target },
