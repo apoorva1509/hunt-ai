@@ -1,19 +1,7 @@
 "use client";
 
 import { Clock, UserPlus, Send, Briefcase, MessageSquare } from "lucide-react";
-
-interface TimelineEvent {
-  date: number;
-  icon: "connection" | "message" | "application" | "outreach";
-  description: string;
-}
-
-interface ActivityTimelineProps {
-  connections: any[];
-  leads: any[];
-  drafts: any[];
-  people: Map<string, string>;
-}
+import type { TimelineEvent, ActivityTimelineProps } from "./types";
 
 const ICONS = {
   connection: UserPlus,

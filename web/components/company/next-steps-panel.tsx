@@ -3,21 +3,7 @@
 import { AlertTriangle, MessageSquare, Send } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-
-interface NextStep {
-  id: string;
-  type: "follow_up" | "send_message" | "thank_accepted";
-  connectionId: Id<"connectionRequests">;
-  personName: string;
-  description: string;
-  urgency: number;
-}
-
-interface NextStepsPanelProps {
-  connections: any[];
-  people: Map<string, string>;
-}
+import type { NextStep, NextStepsPanelProps } from "./types";
 
 export function NextStepsPanel({ connections, people }: NextStepsPanelProps) {
   const updateStatus = useMutation(api.connectionRequests.updateStatus);

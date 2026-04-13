@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAgent } from "@/components/providers/agent-provider";
-import type { Id } from "@/convex/_generated/dataModel";
 import { X } from "lucide-react";
+import type { QuickAddModalProps } from "./types";
 
 const CONTACT_TYPES = [
   { value: "recruiter", label: "Recruiter" },
@@ -15,11 +15,6 @@ const CONTACT_TYPES = [
   { value: "executive", label: "Executive" },
   { value: "other", label: "Other" },
 ] as const;
-
-interface QuickAddModalProps {
-  companyId: Id<"companies">;
-  onClose: () => void;
-}
 
 export function QuickAddModal({ companyId, onClose }: QuickAddModalProps) {
   const { activeAgent } = useAgent();
@@ -38,22 +33,27 @@ export function QuickAddModal({ companyId, onClose }: QuickAddModalProps) {
 
     setSaving(true);
 
-    const personId = await findOrCreatePerson({ name: name.trim() });
+    try {
+      const personId = await findOrCreatePerson({ name: name.trim() });
 
-    await createConnection({
-      agentId: activeAgent._id,
-      personId,
-      companyId,
-      contactRole: role.trim() || "Unknown",
-      contactType: contactType as any,
-      sentDate: Date.now(),
-      status: "pending",
-      noteWithRequest: noteSent,
-      messageSent: false,
-    });
+      await createConnection({
+        agentId: activeAgent._id,
+        personId,
+        companyId,
+        contactRole: role.trim() || "Unknown",
+        contactType: contactType as any,
+        sentDate: Date.now(),
+        status: "pending",
+        noteWithRequest: noteSent,
+        messageSent: false,
+      });
 
-    setSaving(false);
-    onClose();
+      onClose();
+    } catch (err) {
+      console.error("Failed to add connection:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

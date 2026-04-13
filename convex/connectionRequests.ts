@@ -71,6 +71,7 @@ export const create = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requirePerson(ctx);
     return await ctx.db.insert("connectionRequests", {
       ...args,
       updatedAt: Date.now(),
