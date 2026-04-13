@@ -216,6 +216,38 @@ export default defineSchema({
     .index("by_agent", ["agentId"])
     .index("by_agent_and_channel", ["agentId", "channel"]),
 
+  connectionRequests: defineTable({
+    agentId: v.id("agents"),
+    personId: v.id("people"),
+    companyId: v.id("companies"),
+    contactRole: v.string(),
+    contactType: v.union(
+      v.literal("recruiter"),
+      v.literal("hiring_manager"),
+      v.literal("peer"),
+      v.literal("founder"),
+      v.literal("executive"),
+      v.literal("other")
+    ),
+    sentDate: v.number(),
+    status: v.union(
+      v.literal("suggested"),
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("ignored")
+    ),
+    noteWithRequest: v.boolean(),
+    messageSent: v.boolean(),
+    messageDate: v.optional(v.number()),
+    linkedToLeadId: v.optional(v.id("agentItems")),
+    notes: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index("by_agent", ["agentId"])
+    .index("by_company", ["companyId"])
+    .index("by_agent_and_status", ["agentId", "status"])
+    .index("by_agent_and_company", ["agentId", "companyId"]),
+
   agentSkills: defineTable({
     agentId: v.id("agents"),
     skillRef: v.string(),
