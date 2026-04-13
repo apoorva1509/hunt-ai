@@ -5,6 +5,7 @@
 
 import type { SourceAdapter, SourceQuery } from "./types.js";
 import type { DiscoveredJob } from "../types.js";
+import { isValidCompanyName } from "./searxng-helper.js";
 
 const TIMEOUT = 15000;
 const BASE_URL = "https://topstartups.io";
@@ -88,6 +89,8 @@ function parseTopStartupsHTML(html: string): DiscoveredJob[] {
     const company = slugParts[1]
       ?.replace(/-/g, " ")
       .replace(/\b\w/g, (c) => c.toUpperCase()) ?? "";
+
+    if (!isValidCompanyName(company)) continue;
 
     jobs.push({
       company,

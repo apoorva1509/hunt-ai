@@ -3,7 +3,7 @@
 # The scanner queries these sources with your keywords + location.
 
 location: Bangalore
-remote: false
+remote: true
 
 title_filter:
   positive:

@@ -23,6 +23,13 @@ const itemTypeValidator = v.union(
   v.literal("company_analysis")
 );
 
+export const getItem = query({
+  args: { id: v.id("agentItems") },
+  handler: async (ctx, { id }) => {
+    return await ctx.db.get(id);
+  },
+});
+
 export const getAgentItems = query({
   args: { agentId: v.id("agents") },
   handler: async (ctx, { agentId }) => {
@@ -159,5 +166,15 @@ export const clearAgentData = mutation({
     for (const run of runs) {
       await ctx.db.delete(run._id);
     }
+
+    // Delete all tracker URLs
+    const trackerUrls = await ctx.db
+      .query("trackerUrls")
+      .withIndex("by_agent", (q) => q.eq("agentId", agentId))
+      .collect();
+    for (const url of trackerUrls) {
+      await ctx.db.delete(url._id);
+    }
   },
 });
+

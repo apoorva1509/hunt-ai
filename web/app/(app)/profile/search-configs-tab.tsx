@@ -119,7 +119,7 @@ export function SearchConfigsTab() {
             key={p.slug}
             className={`group rounded-lg border bg-white transition-colors dark:bg-zinc-950 ${
               p.slug === active
-                ? "border-green-300 dark:border-green-800"
+                ? "border-green-300 border-l-4 border-l-green-500 dark:border-green-800 dark:border-l-green-500"
                 : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
             }`}
           >
