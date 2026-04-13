@@ -5,6 +5,7 @@
 
 import type { SourceAdapter, SourceQuery } from "./types.js";
 import type { DiscoveredJob } from "../types.js";
+import { isValidCompanyName } from "./searxng-helper.js";
 
 const TIMEOUT = 15000;
 const ALGOLIA_SEARCH = "https://hn.algolia.com/api/v1/search";
@@ -107,13 +108,18 @@ function parseHNComment(
 
   if (parts.length < 2) return null;
 
-  const company = parts[0];
+  // Find the first part that looks like a company name (not a location/work-mode)
+  const company = parts.find((p) => isValidCompanyName(p)) ?? "";
+
   // Find the part that looks most like a role title
   const role =
     parts.find(
       (p) =>
+        p !== company &&
         /engineer|developer|designer|manager|lead|director|architect|scientist/i.test(p),
-    ) ?? parts[1];
+    ) ??
+    parts.find((p) => p !== company) ??
+    "";
 
   if (!company || !role) return null;
 

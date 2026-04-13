@@ -140,7 +140,7 @@ export async function processJobs(
 ): Promise<ClassifiedJob[]> {
   const results: ClassifiedJob[] = [];
   const total = jobs.length;
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = 5;
   let dead = 0;
 
   console.log(`[process] Processing ${total} jobs in batches of ${BATCH_SIZE}...`);
@@ -183,6 +183,11 @@ export async function processJobs(
     }
 
     console.log(`[process]   → ${results.length} live, ${dead} dead so far`);
+
+    // Rate limit pause between batches to avoid 429s on Claude API
+    if (i + BATCH_SIZE < total) {
+      await new Promise((r) => setTimeout(r, 2000));
+    }
   }
 
   console.log(`[process] Done: ${results.length} live, ${dead} dead, classified jobs`);
@@ -712,6 +717,72 @@ function extractDomainFromResults(results: SearchResult[], company: string): str
 }
 
 // ── Visa Sponsorship Check ───────────────────────────────────
+
+// ── Discover jobs from a company (LinkedIn or web) ──────────
+
+export async function discoverJobsFromCompany(
+  companyName: string,
+  companySlug?: string
+): Promise<DiscoveredJob[]> {
+  console.log(`[tracker] Discovering jobs for company: ${companyName}`);
+
+  const queries = [
+    {
+      query: `"${companyName}" hiring jobs site:greenhouse.io OR site:lever.co OR site:jobs.ashbyhq.com`,
+      num: 15,
+    },
+    {
+      query: `"${companyName}" careers jobs engineer developer`,
+      num: 10,
+    },
+  ];
+
+  if (companySlug) {
+    queries.push({
+      query: `site:linkedin.com/jobs "${companyName}"`,
+      num: 10,
+    });
+  }
+
+  const resultsMap = await batchSearch(queries);
+  const jobs: DiscoveredJob[] = [];
+  const seen = new Set<string>();
+
+  for (const [, results] of resultsMap) {
+    for (const r of results) {
+      if (!r.url || seen.has(r.url)) continue;
+      // Only keep URLs that look like job postings
+      const isJobUrl =
+        /greenhouse\.io|lever\.co|ashbyhq\.com|workable\.com|linkedin\.com\/jobs/.test(
+          r.url
+        );
+      if (!isJobUrl) continue;
+
+      seen.add(r.url);
+      const title = r.title
+        ?.replace(/\s*[-|–—]\s*.+$/, "")
+        .replace(/at .+$/i, "")
+        .trim();
+
+      jobs.push({
+        company: companyName,
+        role: title || "Unknown Role",
+        url: r.url,
+        jobBoard: r.url.includes("linkedin.com")
+          ? "linkedin"
+          : r.url.includes("greenhouse.io")
+            ? "other"
+            : r.url.includes("lever.co")
+              ? "other"
+              : "other",
+        snippet: r.snippet,
+      });
+    }
+  }
+
+  console.log(`[tracker] Found ${jobs.length} job postings for ${companyName}`);
+  return jobs;
+}
 
 export async function checkVisaSponsorship(
   company: string
