@@ -11,9 +11,12 @@ import { useFollowUpNotifications } from "@/hooks/use-follow-up-notifications";
 import { ImportLinkedinDialog } from "./import-linkedin-dialog";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Download, Plus, Target } from "lucide-react";
+import { Download, Plus, Target, Zap } from "lucide-react";
 import type { CompanyStatusFilter } from "./types";
 import { STATUS_TABS } from "./types";
+import { ConnectTab } from "./connect-tab";
+
+type PageView = "tracker" | "connect";
 
 export default function OutreachTrackerPage() {
   const companies = useOutreachCompanies();
@@ -24,6 +27,7 @@ export default function OutreachTrackerPage() {
   const [importStatus, setImportStatus] = useState("");
   const createMessage = useMutation(api.outreachMessages.create);
   const [tab, setTab] = useState<CompanyStatusFilter>("all");
+  const [view, setView] = useState<PageView>("tracker");
 
   if (companies === undefined) {
     return <p className="text-zinc-500">Loading outreach tracker...</p>;
@@ -53,61 +57,95 @@ export default function OutreachTrackerPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowImport(true)}
-            className="flex items-center gap-2 rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            <Download className="h-4 w-4" />
-            Import LinkedIn
-          </button>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-          >
-            <Plus className="h-4 w-4" />
-            Add Company
-          </button>
+          {/* View toggle */}
+          <div className="flex rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 dark:border-zinc-800 dark:bg-zinc-900">
+            <button
+              onClick={() => setView("tracker")}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                view === "tracker"
+                  ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+              }`}
+            >
+              Tracker
+            </button>
+            <button
+              onClick={() => setView("connect")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                view === "connect"
+                  ? "bg-white text-purple-700 shadow-sm dark:bg-zinc-800 dark:text-purple-400"
+                  : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+              }`}
+            >
+              <Zap className="h-3.5 w-3.5" />
+              Connect
+            </button>
+          </div>
+          {view === "tracker" && (
+            <>
+              <button
+                onClick={() => setShowImport(true)}
+                className="flex items-center gap-2 rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <Download className="h-4 w-4" />
+                Import LinkedIn
+              </button>
+              <button
+                onClick={() => setShowAdd(true)}
+                className="flex items-center gap-2 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              >
+                <Plus className="h-4 w-4" />
+                Add Company
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900">
-        {STATUS_TABS.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              tab === key
-                ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-100"
-                : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-            }`}
-          >
-            {label}
-            {counts[key] !== undefined && (
-              <span className="ml-1.5 text-xs text-zinc-400">
-                {counts[key]}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Company cards */}
-      {filtered.length === 0 ? (
-        <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-950">
-          <Target className="mx-auto h-8 w-8 text-zinc-300" />
-          <p className="mt-3 text-sm text-zinc-500">
-            {tab === "all"
-              ? 'No companies tracked yet. Click "Add Company" to get started.'
-              : `No ${tab} companies.`}
-          </p>
-        </div>
+      {view === "connect" ? (
+        <ConnectTab />
       ) : (
-        <div className="space-y-4">
-          {filtered.map((company: any) => (
-            <CompanyCard key={company._id} company={company} />
-          ))}
-        </div>
+        <>
+          {/* Filter tabs */}
+          <div className="flex gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900">
+            {STATUS_TABS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  tab === key
+                    ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                }`}
+              >
+                {label}
+                {counts[key] !== undefined && (
+                  <span className="ml-1.5 text-xs text-zinc-400">
+                    {counts[key]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Company cards */}
+          {filtered.length === 0 ? (
+            <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-950">
+              <Target className="mx-auto h-8 w-8 text-zinc-300" />
+              <p className="mt-3 text-sm text-zinc-500">
+                {tab === "all"
+                  ? 'No companies tracked yet. Click "Add Company" to get started.'
+                  : `No ${tab} companies.`}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filtered.map((company: any) => (
+                <CompanyCard key={company._id} company={company} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <AddCompanyDialog open={showAdd} onClose={() => setShowAdd(false)} />

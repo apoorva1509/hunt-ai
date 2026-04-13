@@ -456,4 +456,33 @@ export default defineSchema({
     .index("by_company", ["companyId"])
     .index("by_status", ["status"])
     .index("by_company_and_status", ["companyId", "status"]),
+
+  connectResearch: defineTable({
+    userId: v.string(),
+    companyLinkedinUrl: v.string(),
+    companyName: v.string(),
+    companyDomain: v.optional(v.string()),
+    companyIndustry: v.optional(v.string()),
+    companyDescription: v.optional(v.string()),
+    companyLogoUrl: v.optional(v.string()),
+    role: v.string(),
+    candidates: v.array(v.object({
+      name: v.string(),
+      title: v.string(),
+      headline: v.string(),
+      linkedinUrl: v.string(),
+      email: v.optional(v.string()),
+      photoUrl: v.optional(v.string()),
+      priority: v.number(),
+      tier: v.union(v.literal("tier1"), v.literal("tier2"), v.literal("tier3")),
+      message: v.string(),
+      dmMessage: v.string(),
+      status: v.string(),
+      mode: v.union(v.literal("connection"), v.literal("dm")),
+    })),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_company", ["userId", "companyLinkedinUrl"]),
 });
