@@ -216,3 +216,95 @@ export const APPLIED_VIA_OPTIONS = [
   { key: "email", label: "Email", color: "bg-amber-500" },
   { key: "other", label: "Other", color: "bg-zinc-500" },
 ];
+
+// --- Contact Stage Pipeline ---
+
+export type ContactStage =
+  | "request_sent"
+  | "accepted"
+  | "dm_sent"
+  | "replied"
+  | "no_response";
+
+export const STAGE_ORDER: ContactStage[] = [
+  "request_sent",
+  "accepted",
+  "dm_sent",
+  "replied",
+];
+
+export const STAGE_LABELS: Record<ContactStage, string> = {
+  request_sent: "Request Sent",
+  accepted: "Connected",
+  dm_sent: "DM Sent",
+  replied: "Replied",
+  no_response: "No Response",
+};
+
+export const STAGE_COLORS: Record<ContactStage, string> = {
+  request_sent: "text-blue-400 bg-blue-400",
+  accepted: "text-green-400 bg-green-400",
+  dm_sent: "text-purple-400 bg-purple-400",
+  replied: "text-emerald-400 bg-emerald-400",
+  no_response: "text-red-400 bg-red-400",
+};
+
+// --- Next Step Recommendation ---
+
+export interface NextStep {
+  action: string;
+  dueLabel: string;
+  urgency: "on_track" | "due_soon" | "overdue" | "done";
+}
+
+export const URGENCY_COLORS: Record<NextStep["urgency"], string> = {
+  on_track: "bg-blue-500/10 border-blue-500/30 text-blue-300",
+  due_soon: "bg-amber-500/10 border-amber-500/30 text-amber-300",
+  overdue: "bg-red-500/10 border-red-500/30 text-red-300",
+  done: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
+};
+
+// --- Company Outreach Auto-Status ---
+
+export type CompanyOutreachStatus =
+  | "warming_up"
+  | "needs_outreach"
+  | "following_up"
+  | "in_conversation"
+  | "going_cold"
+  | "done";
+
+export const COMPANY_OUTREACH_LABELS: Record<CompanyOutreachStatus, string> = {
+  warming_up: "Warming Up",
+  needs_outreach: "Needs Outreach",
+  following_up: "Following Up",
+  in_conversation: "In Conversation",
+  going_cold: "Going Cold",
+  done: "Done",
+};
+
+export const COMPANY_OUTREACH_COLORS: Record<CompanyOutreachStatus, string> = {
+  warming_up: "bg-sky-500/20 text-sky-300 border-sky-500/30",
+  needs_outreach: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+  following_up: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  in_conversation: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  going_cold: "bg-red-500/20 text-red-300 border-red-500/30",
+  done: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
+};
+
+export const COMPANY_BORDER_COLORS: Record<CompanyOutreachStatus, string> = {
+  warming_up: "border-l-sky-500",
+  needs_outreach: "border-l-blue-500",
+  following_up: "border-l-amber-500",
+  in_conversation: "border-l-emerald-500",
+  going_cold: "border-l-red-500",
+  done: "border-l-zinc-500",
+};
+
+export interface OutreachFunnel {
+  reached: number;
+  connected: number;
+  dmed: number;
+  replied: number;
+  total: number;
+}
