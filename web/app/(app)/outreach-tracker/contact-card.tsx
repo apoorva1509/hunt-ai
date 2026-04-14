@@ -29,8 +29,10 @@ import {
   TIER_LABELS,
   TIER_COLORS,
 } from "./types";
-import { formatDate, isOverdue } from "./utils";
+import { formatDate, isOverdue, deriveContactStage, deriveNextStep } from "./utils";
 import { FollowUpBadge } from "./follow-up-badge";
+import { StagePipeline } from "./stage-pipeline";
+import { NextStepBanner } from "./next-step-banner";
 import { LogMessageDialog } from "./log-message-dialog";
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -49,7 +51,7 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
     reasoning: string;
   } | null>(null);
 
-  const messages = useOutreachMessages(expanded ? contact._id : null);
+  const messages = useOutreachMessages(contact._id);
   const guidance = useOutreachGuidance(expanded ? contact._id : null);
   const reminders = useFollowUpRemindersByContact(contact._id);
   const activeReminder = reminders?.find((r: any) => isOverdue(r));
@@ -59,6 +61,9 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
   const stopFollowUp = useMutation(api.outreachContacts.stopFollowUp);
   const suggestFollowUp = useAction(api.outreachSuggest.suggestFollowUp);
   const { activeAgent } = useAgent();
+
+  const stage = messages ? deriveContactStage(messages) : null;
+  const nextStep = stage && messages ? deriveNextStep(stage, messages, contact.tier) : null;
 
   const handleSuggest = async () => {
     if (!activeAgent) return;
@@ -77,11 +82,12 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
 
   return (
     <>
-      <div className="rounded-lg border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50 transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900/80 dark:hover:border-zinc-700">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex w-full items-center gap-3 p-3 text-left"
+          className="flex w-full flex-col gap-2 p-3 text-left"
         >
+          <div className="flex w-full items-center gap-3">
           <span className="text-zinc-400">
             {expanded ? (
               <ChevronDown className="h-3.5 w-3.5" />
@@ -150,6 +156,20 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
               </span>
             )}
           </div>
+          </div>
+          {/* Stage pipeline + next step — always visible */}
+          {stage && (
+            <div className="flex w-full items-center gap-3 pl-8">
+              <div className="flex-1">
+                <StagePipeline currentStage={stage} />
+              </div>
+              {nextStep && (
+                <div className="shrink-0">
+                  <NextStepBanner nextStep={nextStep} />
+                </div>
+              )}
+            </div>
+          )}
         </button>
 
         {expanded && (
