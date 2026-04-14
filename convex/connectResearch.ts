@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { requirePerson } from "./helpers/auth";
+import { requirePerson, getCurrentPerson } from "./helpers/auth";
 
 const candidateValidator = v.object({
   name: v.string(),
@@ -22,7 +22,8 @@ const candidateValidator = v.object({
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const person = await requirePerson(ctx);
+    const person = await getCurrentPerson(ctx);
+    if (!person) return [];
     return await ctx.db
       .query("connectResearch")
       .withIndex("by_user", (q) => q.eq("userId", person.clerkTokenIdentifier!))

@@ -343,10 +343,13 @@ export default defineSchema({
       v.literal("failed")
     )),
     researchSummary: v.optional(v.string()),
+    resumeStorageId: v.optional(v.id("_storage")),
+    resumeFileName: v.optional(v.string()),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_user_and_status", ["userId", "status"]),
+    .index("by_user_and_status", ["userId", "status"])
+    .index("by_user_and_domain", ["userId", "domain"]),
 
   outreachContacts: defineTable({
     companyId: v.id("outreachCompanies"),
@@ -378,7 +381,8 @@ export default defineSchema({
     )),
     updatedAt: v.number(),
   })
-    .index("by_company", ["companyId"]),
+    .index("by_company", ["companyId"])
+    .index("by_linkedin_url", ["linkedinUrl"]),
 
   outreachSteps: defineTable({
     companyId: v.id("outreachCompanies"),
@@ -517,4 +521,20 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_company", ["userId", "companyLinkedinUrl"]),
+
+  linkedinSyncState: defineTable({
+    userId: v.string(),
+    lastRunAt: v.number(),
+    lastConnectionName: v.optional(v.string()),
+    lastConnectionDate: v.optional(v.string()),
+    totalConnectionsSynced: v.number(),
+    lastInvitationName: v.optional(v.string()),
+    totalInvitationsSynced: v.number(),
+    lastMessageContactName: v.optional(v.string()),
+    lastMessageBody: v.optional(v.string()),
+    lastMessageTimestamp: v.optional(v.number()),
+    totalMessagesSynced: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
 });
