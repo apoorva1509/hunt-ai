@@ -70,3 +70,12 @@ export function useJobCounts(companyId: Id<"outreachCompanies"> | null) {
     companyId ? { companyId } : "skip"
   );
 }
+
+export function useOutreachMessagesByCompany(
+  companyId: Id<"outreachCompanies"> | null
+) {
+  return useQuery(
+    api.outreachMessages.listByCompany,
+    companyId ? { companyId } : "skip"
+  );
+}
