@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   useOutreachContacts,
   useOutreachSteps,
   useJobCounts,
+  useOutreachMessagesByCompany,
 } from "@/hooks/use-outreach-tracker";
 import {
   ChevronDown,
@@ -20,8 +21,10 @@ import {
   ExternalLink,
   Loader2,
 } from "lucide-react";
-import type { OutreachCompany } from "./types";
-import { stepsProgress } from "./utils";
+import type { OutreachCompany, OutreachMessage } from "./types";
+import { COMPANY_BORDER_COLORS } from "./types";
+import { stepsProgress, deriveContactStage, computeOutreachFunnel, deriveCompanyOutreachStatus } from "./utils";
+import { OutreachFunnelBar } from "./outreach-funnel";
 import { ContactCard } from "./contact-card";
 import { AddContactDialog } from "./add-contact-dialog";
 import { JobsTab } from "./jobs-tab";
@@ -52,9 +55,40 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
   const [addingStep, setAddingStep] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("jobs");
 
-  const contacts = useOutreachContacts(expanded ? company._id : null);
+  const contacts = useOutreachContacts(company._id);
   const steps = useOutreachSteps(expanded ? company._id : null);
   const jobCounts = useJobCounts(expanded ? company._id : null);
+  const companyMessages = useOutreachMessagesByCompany(company._id);
+
+  const { funnel, outreachStatus } = useMemo(() => {
+    if (!contacts || !companyMessages) {
+      return {
+        funnel: { reached: 0, connected: 0, dmed: 0, replied: 0, total: 0 },
+        outreachStatus: "needs_outreach" as const,
+      };
+    }
+
+    const messagesByContact = new Map<string, OutreachMessage[]>();
+    for (const msg of companyMessages) {
+      const existing = messagesByContact.get(msg.contactId) ?? [];
+      existing.push(msg as OutreachMessage);
+      messagesByContact.set(msg.contactId, existing);
+    }
+
+    const stages = contacts.map((contact: any) => {
+      const contactMessages = messagesByContact.get(contact._id) ?? [];
+      return deriveContactStage(contactMessages);
+    });
+
+    const funnel = computeOutreachFunnel(stages);
+    const latestMessage = companyMessages.length > 0
+      ? Math.max(...companyMessages.map((m: any) => m.sentAt))
+      : null;
+    const outreachStatus = deriveCompanyOutreachStatus(funnel, latestMessage);
+
+    return { funnel, outreachStatus };
+  }, [contacts, companyMessages]);
+
   const createStep = useMutation(api.outreachSteps.create);
   const updateStepStatus = useMutation(api.outreachSteps.updateStatus);
   const removeStep = useMutation(api.outreachSteps.remove);
@@ -90,7 +124,7 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
 
   return (
     <>
-      <div className="rounded-xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950">
+      <div className={`rounded-xl border border-zinc-200 border-l-4 bg-white shadow-sm transition-all hover:shadow-lg hover:shadow-zinc-900/5 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:shadow-zinc-100/5 ${COMPANY_BORDER_COLORS[outreachStatus]}`}>
         {/* Header */}
         <button
           onClick={() => setExpanded(!expanded)}
@@ -120,7 +154,7 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
                   ) : (
                     <Building2 className="h-4 w-4 text-zinc-400" />
                   )}
-                  <h3 className="text-base font-semibold">{company.name}</h3>
+                  <h3 className="text-base font-bold tracking-tight">{company.name}</h3>
                   {company.isYcBacked && (
                     <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-600 dark:bg-orange-900/30 dark:text-orange-300">
                       YC
@@ -185,6 +219,13 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
             </div>
           </div>
         </button>
+
+        {/* Outreach Funnel — always visible */}
+        {funnel.total > 0 && (
+          <div className="border-t border-zinc-100 px-5 py-2.5 dark:border-zinc-800/50">
+            <OutreachFunnelBar funnel={funnel} outreachStatus={outreachStatus} />
+          </div>
+        )}
 
         {/* Expanded */}
         {expanded && (
