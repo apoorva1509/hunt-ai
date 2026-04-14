@@ -47,9 +47,12 @@ export default function OutreachTrackerPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">
-            Outreach Tracker ({companies.length})
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-emerald-400 bg-clip-text text-transparent">
+            Outreach Tracker
           </h1>
+          <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-sm font-semibold text-zinc-300">
+            {companies.length}
+          </span>
           {overdueCount !== undefined && overdueCount > 0 && (
             <span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
               {overdueCount} follow-up{overdueCount !== 1 ? "s" : ""} due
@@ -112,9 +115,15 @@ export default function OutreachTrackerPage() {
               <button
                 key={key}
                 onClick={() => setTab(key)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
                   tab === key
-                    ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-100"
+                    ? key === "active"
+                      ? "bg-green-500/20 text-green-300 shadow-sm ring-1 ring-green-500/30"
+                      : key === "paused"
+                        ? "bg-amber-500/20 text-amber-300 shadow-sm ring-1 ring-amber-500/30"
+                        : key === "closed"
+                          ? "bg-zinc-500/20 text-zinc-300 shadow-sm ring-1 ring-zinc-500/30"
+                          : "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-100"
                     : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                 }`}
               >
