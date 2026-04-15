@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   useOutreachCompaniesWithStats,
@@ -56,7 +56,7 @@ function matchesOutreachFilter(
   }
 }
 
-export default function OutreachTrackerPage() {
+function OutreachTrackerContent() {
   const companies = useOutreachCompaniesWithStats();
   const overdueCount = useOverdueCount();
   useFollowUpNotifications();
@@ -334,5 +334,13 @@ export default function OutreachTrackerPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function OutreachTrackerPage() {
+  return (
+    <Suspense>
+      <OutreachTrackerContent />
+    </Suspense>
   );
 }
