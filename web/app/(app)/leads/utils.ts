@@ -65,7 +65,7 @@ export function groupLeadsByCompany(
       ...new Set(
         companyLeads
           .map((l) => l.data.workMode)
-          .filter((w): w is string => !!w && w !== "unknown")
+          .filter((w) => !!w && w !== "unknown")
       ),
     ];
     const location =

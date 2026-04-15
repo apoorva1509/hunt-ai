@@ -8,6 +8,10 @@ export function useOutreachCompanies() {
   return useQuery(api.outreachCompanies.list, {});
 }
 
+export function useOutreachCompaniesWithStats() {
+  return useQuery(api.outreachCompanies.listWithStats, {});
+}
+
 export function useOutreachContacts(companyId: Id<"outreachCompanies"> | null) {
   return useQuery(
     api.outreachContacts.listByCompany,

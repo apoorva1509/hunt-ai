@@ -1,0 +1,167 @@
+%-------------------------
+% Resume in Latex -- Base Template
+% Author : Apoorva Agarwal (based on Jake Gutierrez template)
+%------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\usepackage{fontawesome5}
+\usepackage{multicol}
+\setlength{\multicolsep}{-3.0pt}
+\setlength{\columnsep}{-1pt}
+\input{glyphtounicode}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.6in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1.19in}
+\addtolength{\topmargin}{-.7in}
+\addtolength{\textheight}{1.5in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-5pt}\scshape\raggedright\large\bfseries
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+\pdfgentounicode=1
+
+% Custom commands
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-3pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-3pt}\item
+    \begin{tabular*}{1.0\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & \textbf{\small #2} \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-8pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{1.001\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & \textbf{\small #2}\\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\renewcommand\labelitemi{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.0in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-6pt}}
+
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+%----------HEADING----------
+\begin{center}
+    {\Huge \scshape Apoorva Agarwal} \\ \vspace{1pt}
+    Bengaluru, Karnataka, India \\ \vspace{1pt}
+    \small \raisebox{-0.1\height}\faPhone\ +917619844444 ~
+    \href{mailto:apoorvaagarwal1509@gmail.com}{\raisebox{-0.2\height}\faEnvelope\ \underline{apoorvaagarwal1509@gmail.com}} ~
+    \href{https://linkedin.com/in/}{\raisebox{-0.2\height}\faLinkedin\ \underline{linkedin.com/in/apoorva-agarwal-8420ab1b3}}  ~
+    \href{https://github.com/}{\raisebox{-0.2\height}\faGithub\ \underline{github.com/apoorva1509}}
+    \vspace{-10pt}
+\end{center}
+
+%-----------SUMMARY-----------
+\section{Summary}
+\small{__SUMMARY_PLACEHOLDER__}
+\vspace{-6pt}
+
+%-----------EDUCATION-----------
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {BITS Pilani, KK Birla Goa Campus}{July 2019 -- May 2023}
+      {M.Sc. Mathematics and Data Science Minor}{}
+  \resumeSubHeadingListEnd
+
+%-----------EXPERIENCE-----------
+\section{Experience}
+  \resumeSubHeadingListStart
+
+    \resumeSubheading
+      {Salesmonk}{September 2023 -- Present}
+      {__SALESMONK_TITLE__}{Gurugram, India}
+      \resumeItemListStart
+        __SALESMONK_BULLETS__
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Curelink}{May 2022 -- December 2022}
+      {Backend Developer Intern}{Gurugram, India}
+      \resumeItemListStart
+        __CURELINK_BULLETS__
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Writesonic}{April 2023 -- June 2023}
+      {Full Stack Developer Intern}{Bengaluru, India}
+      \resumeItemListStart
+        __WRITESONIC_BULLETS__
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Instasell}{September 2021 -- December 2021}
+      {Software Developer Intern}{}
+      \resumeItemListStart
+        __INSTASELL_BULLETS__
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Google Summer Of Code, CDLI}{June 2021 -- August 2021}
+      {Software Developer Intern}{}
+      \resumeItemListStart
+        __GSOC_BULLETS__
+      \resumeItemListEnd
+
+  \resumeSubHeadingListEnd
+
+%-----------TECHNICAL SKILLS-----------
+\section{Technical Skills}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+\small{\item{
+    __SKILLS_CONTENT__
+}}
+ \end{itemize}
+ \vspace{-8pt}
+
+%-----------LEADERSHIP / EXTRACURRICULARS-----------
+\section{Leadership / Extracurricular}
+    \resumeSubHeadingListStart
+        \resumeSubheading{BITS GOA WOMEN IN TECH}{}{Member}{}
+            \resumeItemListStart
+                \resumeItem{Delivered seminars advising women in tech on software engineering careers and Google Summer of Code, drawing from personal GSoC experience.}
+            \resumeItemListEnd
+    \resumeSubHeadingListEnd
+
+\end{document}

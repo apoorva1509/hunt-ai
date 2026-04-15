@@ -19,6 +19,8 @@ export interface OutreachCompany {
   careersUrl?: string;
   researchStatus?: "pending" | "researching" | "done" | "failed";
   researchSummary?: string;
+  resumeStorageId?: string;
+  resumeFileName?: string;
 }
 
 export type ContactTier = "tier1" | "tier2" | "tier3";
@@ -38,6 +40,7 @@ export interface OutreachContact {
   followUpStoppedReason?: FollowUpStoppedReason;
   updatedAt: number;
   tier?: ContactTier;
+  connectionStatus?: "pending" | "accepted";
 }
 
 export interface OutreachStep {
@@ -84,6 +87,45 @@ export const STATUS_TABS: { key: CompanyStatusFilter; label: string }[] = [
   { key: "active", label: "Active" },
   { key: "paused", label: "Paused" },
   { key: "closed", label: "Closed" },
+];
+
+export interface CompanyStats {
+  contactCount: number;
+  outboundDMCount: number;
+  inboundCount: number;
+  totalMessages: number;
+  appliedJobCount: number;
+  hasResume: boolean;
+  latestMessageAt: number | null;
+}
+
+export type OutreachFilter =
+  | "all"
+  | "dms_sent"
+  | "replied"
+  | "no_dms"
+  | "applied"
+  | "has_resume"
+  | "no_contacts"
+  | "going_cold"
+  | "yc_backed"
+  | "in_conversation";
+
+export const OUTREACH_FILTERS: {
+  key: OutreachFilter;
+  label: string;
+  description: string;
+}[] = [
+  { key: "all", label: "All", description: "All companies" },
+  { key: "dms_sent", label: "DMs Sent", description: "Sent at least 1 DM" },
+  { key: "replied", label: "Replied", description: "Got at least 1 reply" },
+  { key: "no_dms", label: "No DMs", description: "Connected but no DMs yet" },
+  { key: "applied", label: "Applied", description: "Applied to a job" },
+  { key: "has_resume", label: "Resume", description: "Has tailored resume" },
+  { key: "no_contacts", label: "No Contacts", description: "No contacts added yet" },
+  { key: "going_cold", label: "Going Cold", description: "No messages in 3+ days" },
+  { key: "yc_backed", label: "YC", description: "YC-backed companies" },
+  { key: "in_conversation", label: "In Conversation", description: "Back-and-forth messaging" },
 ];
 
 export const CHANNEL_LABELS: Record<MessageChannel, string> = {

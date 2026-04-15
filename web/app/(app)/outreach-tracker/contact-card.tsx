@@ -23,17 +23,16 @@ import {
 } from "lucide-react";
 import type { OutreachContact } from "./types";
 import {
-  CHANNEL_LABELS,
-  CHANNEL_COLORS,
   GUIDANCE_CHANNELS,
   TIER_LABELS,
   TIER_COLORS,
 } from "./types";
-import { formatDate, isOverdue, deriveContactStage, deriveNextStep } from "./utils";
+import { isOverdue, deriveContactStage, deriveNextStep } from "./utils";
 import { FollowUpBadge } from "./follow-up-badge";
 import { StagePipeline } from "./stage-pipeline";
 import { NextStepBanner } from "./next-step-banner";
 import { LogMessageDialog } from "./log-message-dialog";
+import { ChatThread } from "./chat-thread";
 import type { Id } from "@/convex/_generated/dataModel";
 
 interface ContactCardProps {
@@ -62,7 +61,7 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
   const suggestFollowUp = useAction(api.outreachSuggest.suggestFollowUp);
   const { activeAgent } = useAgent();
 
-  const stage = messages ? deriveContactStage(messages) : null;
+  const stage = messages ? deriveContactStage(messages, contact.connectionStatus) : null;
   const nextStep = stage && messages ? deriveNextStep(stage, messages, contact.tier) : null;
 
   const handleSuggest = async () => {
@@ -136,16 +135,28 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
               </a>
             )}
             {contact.email && (
-              <a
-                href={`mailto:${contact.email}`}
-                onClick={(e) => e.stopPropagation()}
-                className="text-zinc-400 hover:text-zinc-600"
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(contact.email!);
+                }}
+                title={`Copy: ${contact.email}`}
+                className="text-zinc-400 hover:text-zinc-600 cursor-copy"
               >
                 <Mail className="h-3.5 w-3.5" />
-              </a>
+              </button>
             )}
             {contact.phone && (
-              <Phone className="h-3.5 w-3.5 text-zinc-400" />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(contact.phone!);
+                }}
+                title={`Copy: ${contact.phone}`}
+                className="text-zinc-400 hover:text-zinc-600 cursor-copy"
+              >
+                <Phone className="h-3.5 w-3.5" />
+              </button>
             )}
             <span className="rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
               {contact.source}
@@ -316,36 +327,8 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
                   </div>
                 )}
 
-              {/* Message list */}
-              {messages && messages.length > 0 ? (
-                <div className="space-y-2">
-                  {messages.map((msg: any) => (
-                    <div
-                      key={msg._id}
-                      className="rounded-md border border-zinc-200 bg-white p-2.5 dark:border-zinc-700 dark:bg-zinc-800"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${CHANNEL_COLORS[msg.channel as keyof typeof CHANNEL_COLORS] ?? "bg-zinc-100 text-zinc-500"}`}
-                        >
-                          {CHANNEL_LABELS[msg.channel as keyof typeof CHANNEL_LABELS] ?? msg.channel}
-                        </span>
-                        <span className="text-[10px] text-zinc-400">
-                          {msg.direction === "inbound" ? "Received" : "Sent"}{" "}
-                          {formatDate(msg.sentAt)}
-                        </span>
-                      </div>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap line-clamp-3">
-                        {msg.body}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-zinc-400">
-                  No messages logged yet.
-                </p>
-              )}
+              {/* Chat thread */}
+              <ChatThread messages={messages ?? []} />
             </div>
 
             {/* Guidance */}

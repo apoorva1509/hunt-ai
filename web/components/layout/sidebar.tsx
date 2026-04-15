@@ -13,6 +13,7 @@ import {
   LinkIcon,
   Target,
   Building2,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgent } from "@/components/providers/agent-provider";
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { href: "/tracker", label: "Tracker", icon: LinkIcon },
   { href: "/outreach", label: "Outreach", icon: Send },
   { href: "/outreach-tracker", label: "Outreach CRM", icon: Target },
+  { href: "/meetings", label: "Meetings", icon: Calendar },
   { href: "/resumes", label: "Resumes", icon: FileText },
   { href: "/pipeline", label: "Pipeline", icon: Play },
   { href: "/settings", label: "Settings", icon: Settings },

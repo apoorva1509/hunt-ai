@@ -214,6 +214,7 @@ Default modes are in `modes/` (English). Additional language-specific modes are 
 | Processes pending URLs | `pipeline` |
 | Batch processes offers | `batch` |
 | Drops LinkedIn screenshot | `linkedin-log` |
+| Syncs LinkedIn CRM data | `/linkedin-sync` |
 
 ### CV Source of Truth
 

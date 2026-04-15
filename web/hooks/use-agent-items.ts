@@ -14,7 +14,7 @@ export function useAgentItems(type?: ItemType) {
     type ? api.agentItems.getItemsByType : api.agentItems.getAgentItems,
     activeAgent
       ? type
-        ? { agentId: activeAgent._id, type }
+        ? ({ agentId: activeAgent._id, type } as any)
         : { agentId: activeAgent._id }
       : "skip"
   );

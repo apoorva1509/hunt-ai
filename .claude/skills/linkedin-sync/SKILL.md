@@ -23,8 +23,9 @@ agent-browser skills get agent-browser
 1. Close any existing browser: `agent-browser close`
 2. Open with saved state: `agent-browser open "https://www.linkedin.com" --state ~/.agent-browser/linkedin-auth.json`
 3. If redirected to login page (URL contains `/login` or `/uas/login`):
-   - Fill email: `agent-browser fill @emailRef "apoorvaagarwal1509@gmail.com"`
-   - Fill password: `agent-browser fill @passRef "REDACTED_PASSWORD"`
+   - Load credentials from `~/.claude/credentials/linkedin.env` (source the file to get `LINKEDIN_EMAIL` and `LINKEDIN_PASSWORD`)
+   - Fill email: `agent-browser fill @emailRef "$LINKEDIN_EMAIL"`
+   - Fill password: `agent-browser fill @passRef "$LINKEDIN_PASSWORD"`
    - Click sign in via JS: `agent-browser eval "document.querySelectorAll('button').forEach(function(b) { if(b.textContent.trim() === 'Sign in') b.click() })"`
    - Wait 5 seconds, then save state: `agent-browser state save ~/.agent-browser/linkedin-auth.json`
 4. **NEVER ask the user to log in.** Handle auth silently.
@@ -149,6 +150,7 @@ The company name appears as a standalone line after "Contact info" — it's the 
 
 ```bash
 # Create outreach company + contact (deduplicates by LinkedIn URL globally)
+# Pass connectionStatus: "accepted" for connections, "pending" for sent invitations
 npx convex run --no-push linkedinSync:ensureOutreachContact '{
   "userId": "...",
   "companyName": "...",
@@ -158,7 +160,8 @@ npx convex run --no-push linkedinSync:ensureOutreachContact '{
   "contactLinkedinUrl": "...",
   "contactHeadline": "...",
   "contactType": "...",
-  "tier": "..."
+  "tier": "...",
+  "connectionStatus": "accepted"
 }'
 
 # Also log in the people/connectionRequests tables (deduplicates by personId+companyId)
@@ -211,7 +214,7 @@ Each invitation shows:
 For each pending invitation within the sync window:
 
 1. **Visit the person's LinkedIn profile** to get their actual current company and title (same technique as Step 1d — read the intro card, extract company from the line after "Contact info")
-2. **Create outreach company + contact** using the profile-extracted company info via `linkedinSync:ensureOutreachContact`
+2. **Create outreach company + contact** using the profile-extracted company info via `linkedinSync:ensureOutreachContact` — pass `"connectionStatus": "pending"`
 3. **Log connection request** with `connectionStatus: "pending"` via `linkedinLog:logConnection`
 4. **If note exists**, log it as a message:
 
@@ -444,7 +447,7 @@ The system enforces uniqueness at multiple levels:
 | `linkedinSyncState:findUserId` | internalQuery | Get the clerkTokenIdentifier for CLI sync |
 | `linkedinSyncState:get` | internalQuery | Get last sync state by userId |
 | `linkedinSyncState:upsert` | internalMutation | Update sync cursors |
-| `linkedinSync:ensureOutreachContact` | internalMutation | Find/create company + contact (deduplicates globally by LinkedIn URL) |
+| `linkedinSync:ensureOutreachContact` | internalMutation | Find/create company + contact (deduplicates globally by LinkedIn URL). Accepts `connectionStatus` ("pending"/"accepted") |
 | `linkedinSync:listAllContacts` | internalQuery | List all outreach contacts with company info |
 | `linkedinSync:messageExists` | internalQuery | Check if a message already exists (dedup) |
 | `linkedinLog:logConnection` | internalMutation | Log person + company + connection request (deduplicates) |
@@ -475,3 +478,5 @@ The system enforces uniqueness at multiple levels:
 11. **Rate limit**: Add 2-3 second pauses between page navigations, profile visits, and conversation clicks to avoid LinkedIn rate limiting.
 12. **Date-filter invitations**: Only sync invitations sent within the sync window. Don't sync all 79+ pending invitations from months ago.
 13. **Click conversations by name**: Use `h3` headings to find and click conversations by contact name, not generic card CSS selectors.
+14. **Connection status is a field, NOT a message.** Pass `connectionStatus: "accepted"` or `"pending"` to `ensureOutreachContact`. NEVER create fake "Connection accepted" inbound messages in `outreachMessages` — the UI derives the pipeline stage from `connectionStatus` on the contact record, not from messages. Messages are for actual human communication only (DMs, emails, connection request notes).
+15. **CONVEX_DEPLOYMENT env var**: If `npx convex run` fails with "No CONVEX_DEPLOYMENT set", prefix commands with `CONVEX_DEPLOYMENT=dev:steady-opossum-661`.

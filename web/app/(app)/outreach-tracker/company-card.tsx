@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useMutation } from "convex/react";
+import { useState, useMemo, useRef } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   useOutreachContacts,
@@ -20,7 +20,20 @@ import {
   Trash2,
   ExternalLink,
   Loader2,
+  FileText,
+  Upload,
+  Download,
+  Eye,
+  X,
 } from "lucide-react";
+
+function LinkedInIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+    </svg>
+  );
+}
 import type { OutreachCompany, OutreachMessage } from "./types";
 import { COMPANY_BORDER_COLORS } from "./types";
 import { stepsProgress, deriveContactStage, computeOutreachFunnel, deriveCompanyOutreachStatus } from "./utils";
@@ -54,11 +67,15 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
   const [newStepLabel, setNewStepLabel] = useState("");
   const [addingStep, setAddingStep] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("jobs");
+  const [uploading, setUploading] = useState(false);
+  const [showResumePreview, setShowResumePreview] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const contacts = useOutreachContacts(company._id);
   const steps = useOutreachSteps(expanded ? company._id : null);
   const jobCounts = useJobCounts(expanded ? company._id : null);
   const companyMessages = useOutreachMessagesByCompany(company._id);
+  const resumeUrl = useQuery(api.outreachCompanies.getResumeUrl, { id: company._id });
 
   const { funnel, outreachStatus } = useMemo(() => {
     if (!contacts || !companyMessages) {
@@ -77,7 +94,7 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
 
     const stages = contacts.map((contact: any) => {
       const contactMessages = messagesByContact.get(contact._id) ?? [];
-      return deriveContactStage(contactMessages);
+      return deriveContactStage(contactMessages, contact.connectionStatus);
     });
 
     const funnel = computeOutreachFunnel(stages);
@@ -94,6 +111,28 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
   const removeStep = useMutation(api.outreachSteps.remove);
   const updateCompany = useMutation(api.outreachCompanies.update);
   const removeCompany = useMutation(api.outreachCompanies.remove);
+  const generateUploadUrl = useMutation(api.outreachCompanies.generateResumeUploadUrl);
+  const linkResume = useMutation(api.outreachCompanies.linkResume);
+  const removeResume = useMutation(api.outreachCompanies.removeResume);
+
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      const { storageId } = await res.json();
+      await linkResume({ id: company._id, storageId, fileName: file.name });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const progress = steps ? stepsProgress(steps) : { done: 0, total: 0 };
 
@@ -193,6 +232,17 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
                     {progress.done}/{progress.total} steps
                   </p>
                 )}
+                {company.linkedinUrl && (
+                  <a
+                    href={company.linkedinUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-zinc-400 hover:text-[#0A66C2] transition-colors"
+                  >
+                    <LinkedInIcon className="h-3.5 w-3.5" />
+                  </a>
+                )}
                 {company.websiteUrl && (
                   <a
                     href={company.websiteUrl}
@@ -203,6 +253,29 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
+                )}
+                {company.resumeStorageId ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowResumePreview(true);
+                    }}
+                    className="text-green-500 hover:text-green-700 transition-colors"
+                    title={company.resumeFileName ?? "Resume"}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                    className="text-zinc-300 hover:text-zinc-500 transition-colors"
+                    title="Upload tailored resume"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                  </button>
                 )}
                 <button
                   onClick={(e) => {
@@ -248,20 +321,42 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
                   {s}
                 </button>
               ))}
-              {company.websiteUrl && (
-                <a
-                  href={
-                    company.websiteUrl.startsWith("http")
-                      ? company.websiteUrl
-                      : `https://${company.websiteUrl}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-auto text-zinc-400 hover:text-zinc-600"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              )}
+              <div className="ml-auto flex items-center gap-2">
+                {company.resumeStorageId ? (
+                  <>
+                    <button
+                      onClick={() => setShowResumePreview(true)}
+                      className="flex items-center gap-1 rounded-md bg-green-100 px-2 py-1 text-[11px] font-medium text-green-700 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300"
+                    >
+                      <Eye className="h-3 w-3" />
+                      Resume
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-500 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
+                  >
+                    <Upload className="h-3 w-3" />
+                    {uploading ? "Uploading..." : "Upload Resume"}
+                  </button>
+                )}
+                {company.websiteUrl && (
+                  <a
+                    href={
+                      company.websiteUrl.startsWith("http")
+                        ? company.websiteUrl
+                        : `https://${company.websiteUrl}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-zinc-400 hover:text-zinc-600"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
             </div>
 
             {/* Tab bar */}
@@ -458,6 +553,72 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
         onClose={() => setShowAddContact(false)}
         companyId={company._id}
       />
+
+      {/* Hidden file input for resume upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        className="hidden"
+        onChange={handleResumeUpload}
+      />
+
+      {/* Resume preview modal */}
+      {showResumePreview && resumeUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="relative w-full max-w-4xl h-[85vh] mx-4 rounded-xl bg-white shadow-2xl dark:bg-zinc-900 flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-zinc-500" />
+                <span className="text-sm font-medium">
+                  {company.resumeFileName ?? "Resume"} — {company.name}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1 rounded-md bg-zinc-100 px-2.5 py-1.5 text-[11px] font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
+                >
+                  <Upload className="h-3 w-3" />
+                  Replace
+                </button>
+                <a
+                  href={resumeUrl}
+                  download={company.resumeFileName ?? "resume.pdf"}
+                  className="flex items-center gap-1 rounded-md bg-zinc-100 px-2.5 py-1.5 text-[11px] font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
+                >
+                  <Download className="h-3 w-3" />
+                  Download
+                </a>
+                <button
+                  onClick={() => {
+                    if (confirm("Remove this resume?")) {
+                      removeResume({ id: company._id });
+                      setShowResumePreview(false);
+                    }
+                  }}
+                  className="flex items-center gap-1 rounded-md bg-red-100 px-2.5 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => setShowResumePreview(false)}
+                  className="text-zinc-400 hover:text-zinc-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <iframe
+                src={resumeUrl}
+                className="w-full h-full"
+                title="Resume preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

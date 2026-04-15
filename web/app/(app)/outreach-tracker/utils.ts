@@ -44,7 +44,8 @@ export function daysOverdue(reminder: FollowUpReminder): number {
 }
 
 export function deriveContactStage(
-  messages: OutreachMessage[]
+  messages: OutreachMessage[],
+  connectionStatus?: "pending" | "accepted"
 ): ContactStage {
   const hasInbound = messages.some((m) => m.direction === "inbound");
   if (hasInbound) return "replied";
@@ -59,10 +60,7 @@ export function deriveContactStage(
   );
   if (hasEmail) return "dm_sent";
 
-  const hasConnection = messages.some(
-    (m) => m.channel === "linkedin_connection" && m.direction === "outbound"
-  );
-  if (hasConnection) return "request_sent";
+  if (connectionStatus === "accepted") return "accepted";
 
   return "request_sent";
 }
