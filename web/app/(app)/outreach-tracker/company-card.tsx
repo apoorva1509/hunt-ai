@@ -63,6 +63,10 @@ type ActiveTab = "jobs" | "people" | "pipeline";
 
 export function CompanyCard({ company, initialExpanded = false }: { company: OutreachCompany; initialExpanded?: boolean }) {
   const [expanded, setExpanded] = useState(initialExpanded);
+
+  useEffect(() => {
+    if (initialExpanded) setExpanded(true);
+  }, [initialExpanded]);
   const [showAddContact, setShowAddContact] = useState(false);
   const [newStepLabel, setNewStepLabel] = useState("");
   const [addingStep, setAddingStep] = useState(false);
