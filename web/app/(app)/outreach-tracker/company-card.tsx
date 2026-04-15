@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
@@ -61,8 +61,8 @@ const RESEARCH_STATUS_COLORS: Record<string, string> = {
 
 type ActiveTab = "jobs" | "people" | "pipeline";
 
-export function CompanyCard({ company }: { company: OutreachCompany }) {
-  const [expanded, setExpanded] = useState(false);
+export function CompanyCard({ company, initialExpanded = false }: { company: OutreachCompany; initialExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(initialExpanded);
   const [showAddContact, setShowAddContact] = useState(false);
   const [newStepLabel, setNewStepLabel] = useState("");
   const [addingStep, setAddingStep] = useState(false);
@@ -70,6 +70,13 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
   const [uploading, setUploading] = useState(false);
   const [showResumePreview, setShowResumePreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (initialExpanded && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [initialExpanded]);
 
   const contacts = useOutreachContacts(company._id);
   const steps = useOutreachSteps(expanded ? company._id : null);
@@ -163,7 +170,7 @@ export function CompanyCard({ company }: { company: OutreachCompany }) {
 
   return (
     <>
-      <div className={`rounded-xl border border-zinc-200 border-l-4 bg-white shadow-sm transition-all hover:shadow-lg hover:shadow-zinc-900/5 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:shadow-zinc-100/5 ${COMPANY_BORDER_COLORS[outreachStatus]}`}>
+      <div ref={cardRef} className={`rounded-xl border border-zinc-200 border-l-4 bg-white shadow-sm transition-all hover:shadow-lg hover:shadow-zinc-900/5 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:shadow-zinc-100/5 ${COMPANY_BORDER_COLORS[outreachStatus]}`}>
         {/* Header */}
         <button
           onClick={() => setExpanded(!expanded)}

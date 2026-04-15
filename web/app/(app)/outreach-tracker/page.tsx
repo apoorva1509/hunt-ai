@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   useOutreachCompaniesWithStats,
   useOverdueCount,
@@ -67,6 +68,8 @@ export default function OutreachTrackerPage() {
   const [outreachFilter, setOutreachFilter] = useState<OutreachFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [view, setView] = useState<PageView>("tracker");
+  const searchParams = useSearchParams();
+  const highlightCompanyId = searchParams.get("company");
 
   const filtered = useMemo(() => {
     if (!companies) return [];
@@ -285,7 +288,7 @@ export default function OutreachTrackerPage() {
           ) : (
             <div className="space-y-4">
               {filtered.map((company: any) => (
-                <CompanyCard key={company._id} company={company} />
+                <CompanyCard key={company._id} company={company} initialExpanded={company._id === highlightCompanyId} />
               ))}
             </div>
           )}
