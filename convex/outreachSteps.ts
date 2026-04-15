@@ -1,6 +1,6 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import { requirePerson } from "./helpers/auth";
+import { requirePerson, getCurrentPerson } from "./helpers/auth";
 
 const stepStatusValidator = v.union(
   v.literal("pending"),
@@ -122,7 +122,6 @@ export const createInternal = internalMutation({
 export const listAllWithCompany = query({
   args: {},
   handler: async (ctx) => {
-    const { getCurrentPerson } = await import("./helpers/auth");
     const person = await getCurrentPerson(ctx);
     if (!person) return [];
     const userId = person.clerkTokenIdentifier!;

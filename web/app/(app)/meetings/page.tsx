@@ -25,14 +25,18 @@ export default function MeetingsPage() {
     );
   }
 
-  const upcoming = steps.filter((s) => s.status === "pending");
-  const past = steps.filter((s) => s.status === "done" || s.status === "skipped");
-  const displayed = tab === "upcoming" ? upcoming : tab === "past" ? past : steps;
+  // Only show actual meetings/interviews/calls — not generic pipeline steps
+  const MEETING_PATTERNS = /interview|call|chat|meet|round|screen|sync|demo|discussion|r1|r2|r3|l1|l2|l3|hm round/i;
+  const meetings = steps.filter((s) => MEETING_PATTERNS.test(s.label));
+
+  const upcoming = meetings.filter((s) => s.status === "pending");
+  const past = meetings.filter((s) => s.status === "done" || s.status === "skipped");
+  const displayed = tab === "upcoming" ? upcoming : tab === "past" ? past : meetings;
 
   const tabs: { key: TabKey; label: string; count: number }[] = [
     { key: "upcoming", label: "Upcoming", count: upcoming.length },
     { key: "past", label: "Past", count: past.length },
-    { key: "all", label: "All", count: steps.length },
+    { key: "all", label: "All", count: meetings.length },
   ];
 
   return (
