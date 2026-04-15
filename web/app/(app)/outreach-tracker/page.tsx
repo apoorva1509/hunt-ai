@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, Suspense } from "react";
+import { useState, useMemo, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   useOutreachCompaniesWithStats,
@@ -66,10 +66,18 @@ function OutreachTrackerContent() {
   const createMessage = useMutation(api.outreachMessages.create);
   const [statusTab, setStatusTab] = useState<CompanyStatusFilter>("all");
   const [outreachFilter, setOutreachFilter] = useState<OutreachFilter>("all");
-  const [searchQuery, setSearchQuery] = useState("");
   const [view, setView] = useState<PageView>("tracker");
   const searchParams = useSearchParams();
   const highlightCompanyId = searchParams.get("company");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Pre-fill search with company name when navigating from meetings page
+  useEffect(() => {
+    if (highlightCompanyId && companies) {
+      const target = companies.find((c: any) => c._id === highlightCompanyId);
+      if (target) setSearchQuery(target.name);
+    }
+  }, [highlightCompanyId, companies]);
 
   const filtered = useMemo(() => {
     if (!companies) return [];
