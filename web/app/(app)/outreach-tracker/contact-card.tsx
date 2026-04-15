@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAgent } from "@/components/providers/agent-provider";
@@ -19,6 +19,7 @@ import {
   Phone,
   Plus,
   Sparkles,
+  Check,
   Trash2,
 } from "lucide-react";
 import type { OutreachContact } from "./types";
@@ -49,6 +50,13 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
     message: string;
     reasoning: string;
   } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const copyToClipboard = useCallback((text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  }, []);
 
   const messages = useOutreachMessages(contact._id);
   const guidance = useOutreachGuidance(expanded ? contact._id : null);
@@ -138,24 +146,34 @@ export function ContactCard({ contact, companyId }: ContactCardProps) {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigator.clipboard.writeText(contact.email!);
+                  copyToClipboard(contact.email!, "email");
                 }}
                 title={`Copy: ${contact.email}`}
-                className="text-zinc-400 hover:text-zinc-600 cursor-copy"
+                className="flex items-center gap-1 text-zinc-400 hover:text-zinc-600 cursor-copy"
               >
-                <Mail className="h-3.5 w-3.5" />
+                {copiedField === "email" ? (
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                ) : (
+                  <Mail className="h-3.5 w-3.5" />
+                )}
+                <span className="text-[10px] max-w-[120px] truncate">{copiedField === "email" ? "Copied!" : contact.email}</span>
               </button>
             )}
             {contact.phone && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigator.clipboard.writeText(contact.phone!);
+                  copyToClipboard(contact.phone!, "phone");
                 }}
                 title={`Copy: ${contact.phone}`}
-                className="text-zinc-400 hover:text-zinc-600 cursor-copy"
+                className="flex items-center gap-1 text-zinc-400 hover:text-zinc-600 cursor-copy"
               >
-                <Phone className="h-3.5 w-3.5" />
+                {copiedField === "phone" ? (
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                ) : (
+                  <Phone className="h-3.5 w-3.5" />
+                )}
+                <span className="text-[10px] max-w-[120px] truncate">{copiedField === "phone" ? "Copied!" : contact.phone}</span>
               </button>
             )}
             <span className="rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
