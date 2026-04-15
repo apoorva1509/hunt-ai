@@ -160,3 +160,25 @@ export const batchCreate = internalMutation({
     return inserted;
   },
 });
+
+export const patchInternal = internalMutation({
+  args: {
+    id: v.id("outreachJobs"),
+    description: v.optional(v.string()),
+    url: v.optional(v.string()),
+    location: v.optional(v.string()),
+    status: v.optional(statusValidator),
+    appliedAt: v.optional(v.number()),
+    appliedVia: v.optional(v.string()),
+    appliedNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, { id, ...fields }) => {
+    const job = await ctx.db.get(id);
+    if (!job) throw new Error("Job not found");
+    const patch: Record<string, unknown> = { updatedAt: Date.now() };
+    for (const [k, v] of Object.entries(fields)) {
+      if (v !== undefined) patch[k] = v;
+    }
+    await ctx.db.patch(id, patch);
+  },
+});

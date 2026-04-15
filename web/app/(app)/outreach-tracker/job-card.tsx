@@ -15,6 +15,7 @@ interface JobCardProps {
 
 export function JobCard({ job, onMarkApplied }: JobCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [showFullDesc, setShowFullDesc] = useState(false);
   const markSkipped = useMutation(api.outreachJobs.markSkipped);
 
   const isApplied = job.status === "applied";
@@ -94,6 +95,16 @@ export function JobCard({ job, onMarkApplied }: JobCardProps) {
                 </button>
               </>
             )}
+            {(isApplied || isSkipped) && (
+              <a
+                href={job.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-zinc-400 hover:text-zinc-600 transition-colors"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
             {job.description && (
               <button
                 onClick={() => setExpanded(!expanded)}
@@ -114,9 +125,17 @@ export function JobCard({ job, onMarkApplied }: JobCardProps) {
 
       {expanded && job.description && (
         <div className="border-t border-zinc-200 px-3 py-2 dark:border-zinc-800">
-          <p className="text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap line-clamp-10">
+          <p className={`text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap ${showFullDesc ? "" : "line-clamp-10"}`}>
             {job.description}
           </p>
+          {job.description.split("\n").length > 10 && (
+            <button
+              onClick={() => setShowFullDesc(!showFullDesc)}
+              className="mt-1 text-[11px] font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400"
+            >
+              {showFullDesc ? "Show less" : "Show more"}
+            </button>
+          )}
         </div>
       )}
     </div>
