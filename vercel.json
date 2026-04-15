@@ -1,6 +1,6 @@
 {
   "installCommand": "npm install && cd web && npm install",
-  "buildCommand": "cd web && rm -f convex && cp -r ../convex . && npm run build",
+  "buildCommand": "cd web && rm -rf convex && cp -r ../convex . && npm run build",
   "outputDirectory": "web/.next",
   "framework": "nextjs"
 }
