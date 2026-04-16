@@ -130,6 +130,26 @@ The company name appears as a standalone line after "Contact info" — it's the 
 
 6. **Last resort only**: If the profile can't be loaded at all, use "Unknown" / "unknown.com". NEVER guess from headlines.
 
+**Extract the company's LinkedIn URL** (CRITICAL for dedup — see Rule #15):
+
+The company name in the intro card is a clickable link to the company's LinkedIn page when the company has one. Pull the `href` so we can dedup the company globally regardless of name spelling ("Wardly AI" vs "WardlyAI"):
+
+```javascript
+// Find the first /company/ link inside the intro card area
+var anchors = document.querySelectorAll('main a[href*="/company/"]');
+var url = null;
+for (var i = 0; i < anchors.length; i++) {
+  var href = anchors[i].getAttribute('href');
+  if (href && href.includes('/company/')) {
+    url = href.startsWith('http') ? href : 'https://www.linkedin.com' + href;
+    break;
+  }
+}
+url ? url.split('?')[0] : null
+```
+
+Pass the result as `companyLinkedinUrl` to `ensureOutreachContact`. If the profile has no company link, omit the field — name + domain dedup will fall back to normalized matching.
+
 **Derive domain from company name:**
 - lowercase, remove spaces → `.com` (e.g., "Stripe" → "stripe.com")
 - For known domains, use the correct one (e.g., "Fulfil.IO" → "fulfil.io", "Gloroots AI" → "gloroots.com")
@@ -149,19 +169,21 @@ The company name appears as a standalone line after "Contact info" — it's the 
 **Create records:**
 
 ```bash
-# Create outreach company + contact (deduplicates by LinkedIn URL globally)
-# Pass connectionStatus: "accepted" for connections, "pending" for sent invitations
+# Create outreach company + contact (deduplicates by LinkedIn URL globally).
+# Company dedup priority: companyLinkedinUrl > companyDomain > normalized name.
+# ALWAYS pass companyLinkedinUrl when the profile has a company link — it is
+# the only field that reliably collapses "Wardly AI" / "WardlyAI" / "Wardly.AI".
 npx convex run --no-push linkedinSync:ensureOutreachContact '{
   "userId": "...",
   "companyName": "...",
   "companyDomain": "...",
+  "companyLinkedinUrl": "https://www.linkedin.com/company/...",
   "contactName": "...",
   "contactTitle": "...",
   "contactLinkedinUrl": "...",
   "contactHeadline": "...",
   "contactType": "...",
-  "tier": "...",
-  "connectionStatus": "accepted"
+  "tier": "..."
 }'
 
 # Also log in the people/connectionRequests tables (deduplicates by personId+companyId)
@@ -420,6 +442,14 @@ New contacts created:  {list}
 
 The system enforces uniqueness at multiple levels:
 
+### outreachCompanies (priority: linkedinUrl > domain > normalized name)
+- `ensureOutreachContact` looks up companies in this order:
+  1. **`companyLinkedinUrl`** via the `by_user_and_linkedin_url` index, with normalization (protocol/`www.`/trailing slash stripped, lowercased)
+  2. **`companyDomain`** via the `by_user_and_domain` index
+  3. **Normalized `companyName`** — strips spaces, punctuation, and common corp suffixes so "Wardly AI", "WardlyAI", "Wardly.AI", and "wardly ai inc" collapse into a single record
+- When an existing company is matched, missing `linkedinUrl` / `domain` / `logoUrl` are backfilled from the new payload.
+- **Pass `companyLinkedinUrl` whenever the profile has a company link.** It is the only field that is reliably globally unique for a company.
+
 ### outreachContacts (by LinkedIn URL — global)
 - `ensureOutreachContact` checks the `by_linkedin_url` index **across ALL companies** before creating
 - Handles URL normalization (with/without trailing slash)
@@ -470,7 +500,7 @@ The system enforces uniqueness at multiple levels:
 3. **NEVER extract company names from headlines.** Always visit the LinkedIn profile and read the intro card. The company name appears as a standalone line after "Contact info" in the intro card text. Headlines produce garbage company names like "Engineering Leader", "Senior Engineer", "Recruitment Specialist", "Founding Engineer Knowl", "Sr Recruiter EarnIn".
 4. **NEVER create contacts under "Unknown" if avoidable.** Visit the profile first. Only use "Unknown" if the profile genuinely shows no company affiliation and no hiring activity.
 5. **Filter LinkedIn quick reply suggestions** — they appear after "Scroll quick replies" in thread text.
-6. **Dedup everything** — contacts by LinkedIn URL globally, people by LinkedIn URL, connection requests by person+company, messages by body+timestamp.
+6. **Dedup everything** — companies by LinkedIn URL > domain > normalized name (always pass `companyLinkedinUrl` when the profile has a company link), contacts by LinkedIn URL globally, people by LinkedIn URL, connection requests by person+company, messages by body+timestamp.
 7. **The scrollable container on LinkedIn pages is `main#workspace`**, not the body/window.
 8. **`agent-browser eval` returns JSON strings** — always parse the result with `JSON.parse()`.
 9. **Save auth state** after every successful login: `agent-browser state save ~/.agent-browser/linkedin-auth.json`
