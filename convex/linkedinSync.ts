@@ -1,5 +1,6 @@
 import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 
 const contactTypeValidator = v.union(
   v.literal("recruiter"),
@@ -17,6 +18,32 @@ const tierValidator = v.union(
 );
 
 /**
+ * Normalize a LinkedIn URL for consistent matching. Drops protocol,
+ * subdomain, trailing slash, and lowercases the path so variants like
+ * `https://www.linkedin.com/company/Wardly/` and
+ * `https://linkedin.com/company/wardly` collide.
+ */
+function normalizeLinkedinUrl(url: string): string {
+  return url
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/$/, "");
+}
+
+/**
+ * Normalize a company name for fuzzy dedup. Strips spaces, punctuation,
+ * and common suffixes so "Wardly AI", "WardlyAI", and "Wardly.AI" collide.
+ */
+function normalizeCompanyName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/(inc|llc|ltd|corp|corporation|co)$/, "");
+}
+
+/**
  * Find or create an outreach company + contact in one call.
  * Used by the linkedin-sync skill (no auth needed).
  */
@@ -25,6 +52,7 @@ export const ensureOutreachContact = internalMutation({
     userId: v.string(),
     companyName: v.string(),
     companyDomain: v.optional(v.string()),
+    companyLinkedinUrl: v.optional(v.string()),
     contactName: v.string(),
     contactTitle: v.optional(v.string()),
     contactLinkedinUrl: v.optional(v.string()),
@@ -33,32 +61,73 @@ export const ensureOutreachContact = internalMutation({
     tier: v.optional(tierValidator),
   },
   handler: async (ctx, args) => {
-    // 1. Find or create outreach company
-    let company = args.companyDomain
-      ? await ctx.db
+    // 1. Find or create outreach company.
+    // Dedup priority: LinkedIn URL > domain > normalized name.
+    let company: Doc<"outreachCompanies"> | null = null;
+
+    // 1a. Match by LinkedIn URL (global per-user; LinkedIn URL is unique).
+    if (args.companyLinkedinUrl) {
+      const targetNorm = normalizeLinkedinUrl(args.companyLinkedinUrl);
+      const candidates = await ctx.db
+        .query("outreachCompanies")
+        .withIndex("by_user_and_linkedin_url", (q) =>
+          q.eq("userId", args.userId)
+        )
+        .collect();
+      company =
+        candidates.find(
+          (c) => c.linkedinUrl && normalizeLinkedinUrl(c.linkedinUrl) === targetNorm
+        ) ?? null;
+    }
+
+    // 1b. Match by domain.
+    if (!company && args.companyDomain) {
+      company =
+        (await ctx.db
           .query("outreachCompanies")
           .withIndex("by_user_and_domain", (q) =>
             q.eq("userId", args.userId).eq("domain", args.companyDomain)
           )
-          .first()
-      : null;
+          .first()) ?? null;
+    }
 
-    // Fallback: search by name
+    // 1c. Fall back to normalized name match so "Wardly AI" and "WardlyAI"
+    // collapse into a single company row.
     if (!company) {
+      const targetName = normalizeCompanyName(args.companyName);
       const allCompanies = await ctx.db
         .query("outreachCompanies")
         .withIndex("by_user", (q) => q.eq("userId", args.userId))
         .collect();
-      company = allCompanies.find(
-        (c) => c.name.toLowerCase() === args.companyName.toLowerCase()
-      ) ?? null;
+      company =
+        allCompanies.find(
+          (c) => normalizeCompanyName(c.name) === targetName
+        ) ?? null;
     }
 
-    const companyId =
-      company?._id ??
-      (await ctx.db.insert("outreachCompanies", {
+    let companyId;
+    if (company) {
+      companyId = company._id;
+      // Backfill missing linkedinUrl / domain on the existing record.
+      const patch: Record<string, unknown> = {};
+      if (args.companyLinkedinUrl && !company.linkedinUrl) {
+        patch.linkedinUrl = args.companyLinkedinUrl;
+      }
+      if (args.companyDomain && !company.domain) {
+        patch.domain = args.companyDomain;
+        if (!company.logoUrl) {
+          patch.logoUrl = `https://logo.clearbit.com/${args.companyDomain}`;
+        }
+      }
+      if (Object.keys(patch).length > 0) {
+        patch.updatedAt = Date.now();
+        await ctx.db.patch(company._id, patch);
+      }
+    } else {
+      companyId = await ctx.db.insert("outreachCompanies", {
         name: args.companyName,
         domain: args.companyDomain,
+        linkedinUrl: args.companyLinkedinUrl,
         logoUrl: args.companyDomain
           ? `https://logo.clearbit.com/${args.companyDomain}`
           : undefined,
@@ -66,7 +135,8 @@ export const ensureOutreachContact = internalMutation({
         userId: args.userId,
         status: "active",
         updatedAt: Date.now(),
-      }));
+      });
+    }
 
     // 2. Find or create outreach contact
     // GLOBAL uniqueness check by LinkedIn URL (across ALL companies)

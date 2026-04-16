@@ -349,7 +349,8 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_status", ["userId", "status"])
-    .index("by_user_and_domain", ["userId", "domain"]),
+    .index("by_user_and_domain", ["userId", "domain"])
+    .index("by_user_and_linkedin_url", ["userId", "linkedinUrl"]),
 
   outreachContacts: defineTable({
     companyId: v.id("outreachCompanies"),

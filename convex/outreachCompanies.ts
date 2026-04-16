@@ -471,6 +471,30 @@ export const mergeCompanies = internalMutation({
   },
 });
 
+// Internal: patch company fields without auth (used by CLI/agent for backfills).
+export const patchInternal = internalMutation({
+  args: {
+    id: v.id("outreachCompanies"),
+    name: v.optional(v.string()),
+    domain: v.optional(v.string()),
+    logoUrl: v.optional(v.string()),
+    linkedinUrl: v.optional(v.string()),
+    websiteUrl: v.optional(v.string()),
+    isYcBacked: v.optional(v.boolean()),
+    fundingStage: v.optional(v.string()),
+    description: v.optional(v.string()),
+    status: v.optional(statusValidator),
+    roleAppliedFor: v.optional(v.string()),
+  },
+  handler: async (ctx, { id, ...fields }) => {
+    const patch: Record<string, unknown> = { updatedAt: Date.now() };
+    for (const [k, val] of Object.entries(fields)) {
+      if (val !== undefined) patch[k] = val;
+    }
+    await ctx.db.patch(id, patch);
+  },
+});
+
 // Internal: create company without auth (used by CLI/agent)
 export const createInternal = internalMutation({
   args: {
