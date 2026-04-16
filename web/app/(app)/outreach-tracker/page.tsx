@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useMemo, Suspense, useEffect, useCallback } from "react";
+import {
+  useState,
+  useMemo,
+  Suspense,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   useOutreachCompaniesWithStats,
@@ -71,41 +78,48 @@ function OutreachTrackerContent() {
   const router = useRouter();
   const pathname = usePathname();
   const highlightCompanyId = searchParams.get("company");
-  const searchQuery = searchParams.get("q") ?? "";
+  const urlQuery = searchParams.get("q") ?? "";
 
-  const writeUrl = useCallback(
-    (nextQuery: string, keepCompany: boolean) => {
+  // Local state drives the input for snappy typing; URL is synced as a side
+  // effect (router.replace is async — binding the input directly to the URL
+  // made typing feel frozen).
+  const [searchQuery, setSearchQuery] = useState(urlQuery);
+  const lastSyncedRef = useRef(urlQuery);
+
+  // External URL changes (back button, deep link, company-id resolver below)
+  // should update the input.
+  useEffect(() => {
+    if (urlQuery !== searchQuery && urlQuery !== lastSyncedRef.current) {
+      setSearchQuery(urlQuery);
+      lastSyncedRef.current = urlQuery;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlQuery]);
+
+  // Debounce input → URL sync so typing is never blocked on navigation.
+  useEffect(() => {
+    if (searchQuery === lastSyncedRef.current) return;
+    const timer = setTimeout(() => {
+      lastSyncedRef.current = searchQuery;
       const params = new URLSearchParams(searchParams.toString());
-      if (nextQuery) {
-        params.set("q", nextQuery);
-      } else {
-        params.delete("q");
-      }
-      if (!keepCompany) {
-        params.delete("company");
-      }
+      if (searchQuery) params.set("q", searchQuery);
+      else params.delete("q");
+      // A user-initiated search change makes the ?company highlight stale.
+      params.delete("company");
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    },
-    [searchParams, router, pathname]
-  );
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchParams, router, pathname]);
 
-  const setSearchQuery = useCallback(
-    (value: string) => {
-      // User-initiated search change: drop stale company highlight
-      writeUrl(value, false);
-    },
-    [writeUrl]
-  );
-
-  // When arriving via ?company=<id>, resolve the company name once and write
-  // it into ?q so the URL reflects what the search bar shows.
+  // When arriving via ?company=<id> with no ?q, pre-fill the search with the
+  // company name so the URL and the input agree.
   useEffect(() => {
     if (!highlightCompanyId || !companies) return;
-    if (searchParams.get("q")) return;
+    if (urlQuery || searchQuery) return;
     const target = companies.find((c: any) => c._id === highlightCompanyId);
-    if (target) writeUrl(target.name, true);
-  }, [highlightCompanyId, companies, searchParams, writeUrl]);
+    if (target) setSearchQuery(target.name);
+  }, [highlightCompanyId, companies, urlQuery, searchQuery]);
 
   const filtered = useMemo(() => {
     if (!companies) return [];

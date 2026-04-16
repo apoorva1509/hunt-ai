@@ -157,3 +157,19 @@ export const listAllWithCompany = query({
     });
   },
 });
+
+export const patchInternal = internalMutation({
+  args: {
+    id: v.id("outreachSteps"),
+    label: v.optional(v.string()),
+    status: v.optional(stepStatusValidator),
+    order: v.optional(v.number()),
+  },
+  handler: async (ctx, { id, label, status, order }) => {
+    const patch: Record<string, unknown> = { updatedAt: Date.now() };
+    if (label !== undefined) patch.label = label;
+    if (status !== undefined) patch.status = status;
+    if (order !== undefined) patch.order = order;
+    await ctx.db.patch(id, patch);
+  },
+});
