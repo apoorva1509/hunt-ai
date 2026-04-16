@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, Suspense, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useMemo, Suspense, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   useOutreachCompaniesWithStats,
   useOverdueCount,
@@ -68,16 +68,44 @@ function OutreachTrackerContent() {
   const [outreachFilter, setOutreachFilter] = useState<OutreachFilter>("all");
   const [view, setView] = useState<PageView>("tracker");
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const highlightCompanyId = searchParams.get("company");
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchQuery = searchParams.get("q") ?? "";
 
-  // Pre-fill search with company name when navigating from meetings page
+  const writeUrl = useCallback(
+    (nextQuery: string, keepCompany: boolean) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (nextQuery) {
+        params.set("q", nextQuery);
+      } else {
+        params.delete("q");
+      }
+      if (!keepCompany) {
+        params.delete("company");
+      }
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [searchParams, router, pathname]
+  );
+
+  const setSearchQuery = useCallback(
+    (value: string) => {
+      // User-initiated search change: drop stale company highlight
+      writeUrl(value, false);
+    },
+    [writeUrl]
+  );
+
+  // When arriving via ?company=<id>, resolve the company name once and write
+  // it into ?q so the URL reflects what the search bar shows.
   useEffect(() => {
-    if (highlightCompanyId && companies) {
-      const target = companies.find((c: any) => c._id === highlightCompanyId);
-      if (target) setSearchQuery(target.name);
-    }
-  }, [highlightCompanyId, companies]);
+    if (!highlightCompanyId || !companies) return;
+    if (searchParams.get("q")) return;
+    const target = companies.find((c: any) => c._id === highlightCompanyId);
+    if (target) writeUrl(target.name, true);
+  }, [highlightCompanyId, companies, searchParams, writeUrl]);
 
   const filtered = useMemo(() => {
     if (!companies) return [];
